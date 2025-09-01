@@ -1,0 +1,21 @@
+# Exclude test server from published package
+test_server/
+
+# Exclude development files
+.git/
+.github/
+.vscode/
+.idea/
+
+# Exclude build directories
+build/
+.dart_tool/
+
+# Exclude logs and temporary files
+*.log
+*.tmp
+
+# Exclude Claude Code files
+.claude/
+*.claude
+claude_*
