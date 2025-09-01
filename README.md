@@ -1,12 +1,20 @@
 # in_app_update_me
 
-[![pub package](https://img.shields.io/pub/v/in_app_update_me.svg)](https://pub.dev/packages/in_app_update_me)
-[![Flutter](https://img.shields.io/badge/Flutter->=3.0.0-blue.svg)](https://flutter.dev/)
-[![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS-lightgrey.svg)](https://github.com/your-username/in_app_update_me)
+<div align="center">
+  <img src="https://flenco.in/wp-content/uploads/2023/09/cropped-flenco-2023.png" alt="Flenco Logo" height="80" />
+  
+  [![Flutter](https://img.shields.io/badge/Flutter->=3.0.0-blue.svg)](https://flutter.dev/)
+  [![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS-lightgrey.svg)]()
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  
+  **A comprehensive Flutter plugin for in-app updates supporting both Android and iOS with direct update capabilities and force update handling.**
 
-A comprehensive Flutter plugin for in-app updates supporting both Android and iOS with direct update capabilities and force update handling.
+  [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-atishpaul-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/atishpaul)
+</div>
 
-## Features
+---
+
+## ✨ Features
 
 ✅ **Cross-platform**: Works on both Android and iOS  
 ✅ **Play Store Updates**: Google Play In-App Updates API support  
@@ -18,7 +26,7 @@ A comprehensive Flutter plugin for in-app updates supporting both Android and iO
 ✅ **Customizable UI**: Pre-built dialogs and widgets  
 ✅ **Priority Levels**: Update importance handling  
 
-## Platform Support
+## 📱 Platform Support
 
 | Platform | Store Updates | Direct Updates | Force Updates | Flexible Updates |
 |----------|---------------|----------------|---------------|------------------|
@@ -27,7 +35,7 @@ A comprehensive Flutter plugin for in-app updates supporting both Android and iO
 
 *iOS doesn't support flexible updates due to platform limitations
 
-## Installation
+## 📦 Installation
 
 Add this to your package's `pubspec.yaml` file:
 
@@ -42,59 +50,9 @@ Then run:
 flutter pub get
 ```
 
-## Platform Setup
+## 🚀 Quick Start
 
-### Android Setup
-
-1. **Minimum SDK**: Set `minSdkVersion` to 21 or higher in `android/app/build.gradle`:
-
-```gradle
-android {
-    defaultConfig {
-        minSdkVersion 21
-    }
-}
-```
-
-2. **Permissions**: Add required permissions to `android/app/src/main/AndroidManifest.xml`:
-
-```xml
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-```
-
-3. **FileProvider** (for direct APK installation): Add to `AndroidManifest.xml`:
-
-```xml
-<provider
-    android:name="androidx.core.content.FileProvider"
-    android:authorities="${applicationId}.fileprovider"
-    android:exported="false"
-    android:grantUriPermissions="true">
-    <meta-data
-        android:name="android.support.FILE_PROVIDER_PATHS"
-        android:resource="@xml/file_paths" />
-</provider>
-```
-
-Create `android/app/src/main/res/xml/file_paths.xml`:
-
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-files-path name="external_files" path="." />
-</paths>
-```
-
-### iOS Setup
-
-1. **Minimum iOS Version**: Set deployment target to 11.0 or higher
-2. **App Store Connect**: Ensure your app is published on App Store for store updates
-3. **Enterprise Distribution**: For direct updates, use enterprise distribution or TestFlight
-
-## Usage
-
-### Basic Store Updates
+### 1. Basic Setup
 
 ```dart
 import 'package:in_app_update_me/in_app_update_me.dart';
@@ -145,7 +103,7 @@ class _MyAppState extends State<MyApp> {
 }
 ```
 
-### Force Updates
+### 2. Force Updates
 
 ```dart
 Future<void> _performForceUpdateCheck() async {
@@ -168,7 +126,7 @@ Future<void> _performForceUpdateCheck() async {
 }
 ```
 
-### Direct Updates (APK/IPA)
+### 3. Direct Updates (APK/IPA)
 
 ```dart
 Future<void> _checkDirectUpdate() async {
@@ -181,22 +139,84 @@ Future<void> _checkDirectUpdate() async {
   if (updateInfo?.updateAvailable == true) {
     // Download and install directly
     await _inAppUpdate.downloadAndInstallUpdate(
-      'https://your-server.com/api/download/app.apk',
+      updateInfo!.downloadUrl!,
     );
   }
 }
 ```
 
-### Custom Configuration
+## ⚙️ Platform Setup
+
+### Android Setup
+
+1. **Minimum SDK**: Set `minSdkVersion` to 21 or higher in `android/app/build.gradle`:
+
+```gradle
+android {
+    defaultConfig {
+        minSdkVersion 21
+    }
+}
+```
+
+2. **Permissions**: Add required permissions to `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+```
+
+3. **FileProvider** (for direct APK installation): Add to `AndroidManifest.xml`:
+
+```xml
+<application>
+  <!-- ... other content ... -->
+  
+  <provider
+      android:name="androidx.core.content.FileProvider"
+      android:authorities="${applicationId}.fileprovider"
+      android:exported="false"
+      android:grantUriPermissions="true">
+      <meta-data
+          android:name="android.support.FILE_PROVIDER_PATHS"
+          android:resource="@xml/file_paths" />
+  </provider>
+</application>
+```
+
+Create `android/app/src/main/res/xml/file_paths.xml`:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-files-path name="external_files" path="." />
+</paths>
+```
+
+### iOS Setup
+
+1. **Minimum iOS Version**: Set deployment target to 11.0 or higher in `ios/Podfile`:
+
+```ruby
+platform :ios, '11.0'
+```
+
+2. **App Store Connect**: Ensure your app is published on App Store for store updates
+3. **Enterprise Distribution**: For direct updates, use enterprise distribution or TestFlight
+
+## 🎯 Complete Usage Guide
+
+### Configuration Options
 
 ```dart
 // Store updates with custom settings
 final storeConfig = UpdateConfig(
-  useStore: true,
-  forceUpdate: false,
-  checkInterval: Duration(hours: 6),
-  showProgressDialog: true,
-  minimumPriority: UpdatePriority.medium,
+  useStore: true,                           // Use Play Store/App Store
+  forceUpdate: false,                      // Make update mandatory
+  checkInterval: Duration(hours: 6),       // Check frequency
+  showProgressDialog: true,                // Show download progress
+  autoCheckOnAppStart: true,               // Auto-check on app start
+  minimumPriority: UpdatePriority.medium,  // Minimum update priority
 );
 
 // Direct updates configuration
@@ -204,71 +224,40 @@ final directConfig = DirectUpdateConfig(
   serverUrl: 'https://your-update-server.com',
   versionEndpoint: '/api/version',
   downloadEndpoint: '/api/download',
+  headers: {'Authorization': 'Bearer token'},
   timeout: Duration(seconds: 30),
   forceUpdate: true,
 );
 ```
 
-## API Reference
-
-### InAppUpdateMe Class
-
-#### Methods
-
-- `initialize(UpdateConfig config)` - Initialize the plugin with configuration
-- `checkForUpdate({bool useStore, String? updateUrl, String? currentVersion})` - Check for available updates
-- `startFlexibleUpdate()` - Start flexible update (Android only)
-- `startImmediateUpdate()` - Start immediate update (Android only)
-- `downloadAndInstallUpdate(String downloadUrl)` - Download and install update directly
-- `openStore()` - Open Play Store or App Store manually
-- `performUpdateCheck(UpdateConfig config)` - Complete update check with configuration
-
-#### Listeners
-
-```dart
-_inAppUpdate.setUpdateListener(DefaultUpdateListener(
-  onProgress: (progress) {/* Download progress 0-100 */},
-  onDownloaded: () {/* Update downloaded */},
-  onInstalled: () {/* Update installed */},
-  onFailed: (error) {/* Update failed */},
-  onResult: (result) {/* Update flow result */},
-));
-```
-
 ### UI Widgets
 
-#### ForceUpdateDialog
-
-Non-dismissible dialog for mandatory updates:
+#### ForceUpdateDialog - Non-dismissible dialog for mandatory updates
 
 ```dart
 ForceUpdateDialog.show(
   context,
   updateInfo,
-  config,
-  onUpdateStarted: () => print('Update started'),
+  UpdateConfig(forceUpdate: true),
+  onUpdateStarted: () => print('Force update started'),
   onError: (error) => print('Error: $error'),
 );
 ```
 
-#### UpdateAvailableDialog
-
-Standard update dialog with options:
+#### UpdateAvailableDialog - Standard update dialog with options
 
 ```dart
 UpdateAvailableDialog.show(
   context,
   updateInfo,
-  config,
+  UpdateConfig(useStore: true),
   onUpdateStarted: () => print('Update started'),
   onUpdateLater: () => print('Update postponed'),
   onError: (error) => print('Error: $error'),
 );
 ```
 
-#### UpdateProgressDialog
-
-Progress dialog for downloads:
+#### UpdateProgressDialog - Progress dialog for downloads
 
 ```dart
 UpdateProgressDialog.show(
@@ -278,95 +267,73 @@ UpdateProgressDialog.show(
 );
 ```
 
-### Configuration Classes
+## 📋 API Reference
 
-#### UpdateConfig
+### InAppUpdateMe Methods
 
-```dart
-UpdateConfig(
-  useStore: true,                           // Use Play Store/App Store
-  updateUrl: 'https://...',                // Direct update URL
-  forceUpdate: false,                      // Make update mandatory
-  checkInterval: Duration(hours: 24),      // Check frequency
-  showProgressDialog: true,                // Show download progress
-  autoCheckOnAppStart: true,               // Auto-check on app start
-  minimumPriority: UpdatePriority.low,     // Minimum update priority
-)
-```
+| Method | Description | Platforms |
+|--------|-------------|-----------|
+| `initialize(UpdateConfig config)` | Initialize the plugin with configuration | Android, iOS |
+| `checkForUpdate({bool useStore, String? updateUrl, String? currentVersion})` | Check for available updates | Android, iOS |
+| `startFlexibleUpdate()` | Start flexible update | Android only |
+| `startImmediateUpdate()` | Start immediate update | Android only |
+| `downloadAndInstallUpdate(String downloadUrl)` | Download and install update directly | Android, iOS |
+| `openStore()` | Open Play Store or App Store manually | Android, iOS |
+| `performUpdateCheck(UpdateConfig config)` | Complete update check with configuration | Android, iOS |
 
-#### DirectUpdateConfig
+### Update Listeners
 
 ```dart
-DirectUpdateConfig(
-  serverUrl: 'https://your-server.com',
-  versionEndpoint: '/api/version',
-  downloadEndpoint: '/api/download',
-  headers: {'Authorization': 'Bearer token'},
-  timeout: Duration(seconds: 30),
-)
+_inAppUpdate.setUpdateListener(DefaultUpdateListener(
+  onProgress: (progress) {
+    // Download progress 0-100
+    print('Progress: $progress%');
+  },
+  onDownloaded: () {
+    // Update downloaded successfully
+    print('Update ready to install');
+  },
+  onInstalled: () {
+    // Update installed successfully
+    print('Update completed');
+  },
+  onFailed: (error) {
+    // Update failed
+    print('Update failed: $error');
+  },
+  onResult: (result) {
+    // Update flow result (success, cancelled, failed)
+    print('Update result: $result');
+  },
+));
 ```
 
-### Models
-
-#### AppUpdateInfo
-
-```dart
-class AppUpdateInfo {
-  final bool updateAvailable;
-  final bool immediateUpdateAllowed;
-  final bool flexibleUpdateAllowed;
-  final String? appStoreVersion;
-  final String? currentVersion;
-  final int? updatePriority;
-  final String? downloadUrl;
-  
-  // Helper methods
-  bool get isHighPriority;
-  bool get shouldForceUpdate;
-}
-```
-
-#### UpdateResult
-
-```dart
-class UpdateResult {
-  final bool updateAvailable;
-  final bool success;
-  final String message;
-  final AppUpdateInfo? updateInfo;
-  final bool isForceUpdate;
-}
-```
-
-## Advanced Usage
+## 🔧 Advanced Usage
 
 ### Custom Update Server
 
-Implement your own update server with these endpoints:
+For direct updates, implement your own update server with these endpoints:
 
-#### Version Check Endpoint
-`GET /api/version`
+#### Version Check Endpoint: `GET /api/version`
 
-Response:
 ```json
 {
   "version": "1.2.0",
   "build": 120,
   "priority": 4,
   "forceUpdate": true,
-  "downloadUrl": "https://server.com/app.apk",
-  "releaseNotes": "Bug fixes and improvements"
+  "downloadUrl": "https://your-server.com/app.apk",
+  "releaseNotes": "Critical security update - Update required to continue"
 }
 ```
 
-#### Download Endpoint
-`GET /api/download`
+#### Download Endpoint: `GET /api/download`
 
-Returns the APK/IPA file with appropriate headers.
+Returns the APK/IPA file with appropriate headers:
+- `Content-Type: application/vnd.android.package-archive` (for APK)
+- `Content-Disposition: attachment; filename="app.apk"`
 
-### Background Updates
-
-For Android flexible updates:
+### Background Updates (Android)
 
 ```dart
 class BackgroundUpdateService {
@@ -378,10 +345,9 @@ class BackgroundUpdateService {
       onDownloaded: () async {
         // Update downloaded in background
         // Show notification to user
-        await _showUpdateReadyNotification();
+        showUpdateReadyNotification();
       },
       onFailed: (error) {
-        // Handle background update failure
         print('Background update failed: $error');
       },
     ));
@@ -396,24 +362,33 @@ class BackgroundUpdateService {
 }
 ```
 
-### Testing
+## 🧪 Testing
 
-1. **Android Testing**:
-   - Use internal testing track on Google Play Console
-   - Test with different update priorities
-   - Verify APK installation permissions
+The plugin includes a complete testing setup:
 
-2. **iOS Testing**:
-   - Use TestFlight for testing App Store updates
-   - Test enterprise distribution for direct updates
-   - Verify App Store redirect functionality
+1. **Unit Tests**: Core functionality testing
+2. **Integration Tests**: Real-world scenario testing
+3. **Test Server**: Mock server for development testing
 
-3. **Direct Update Testing**:
-   - Set up a test server with version API
-   - Test download and installation flow
-   - Verify progress tracking
+### Quick Test Setup
 
-## Error Handling
+```bash
+# 1. Start test server
+cd test_server
+npm install
+npm start
+
+# 2. Run example app  
+cd ../example
+flutter run
+
+# 3. Test with local server:
+# http://localhost:3000/api/version/optional-update
+```
+
+See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing instructions.
+
+## 🐛 Error Handling
 
 ```dart
 try {
@@ -421,66 +396,124 @@ try {
   
   if (!result.success) {
     // Handle update check failure
-    showSnackBar('Update check failed: ${result.message}');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Update check failed: ${result.message}')),
+    );
   }
 } catch (e) {
   // Handle exceptions
-  showSnackBar('Update error: $e');
+  print('Update error: $e');
 }
 ```
 
-## Troubleshooting
+## 🔍 Troubleshooting
 
 ### Common Issues
 
-1. **"Update not available" on Android**
-   - Ensure app is published on Play Store
-   - Check that newer version exists
-   - Verify app signing consistency
+#### Android Issues
+
+1. **"Update not available" on Google Play**
+   - Ensure app is published on Play Store (at least in Internal Testing)
+   - Verify that a newer version exists with higher `versionCode`
+   - Check app signing consistency between versions
 
 2. **APK installation blocked**
-   - Enable "Install from Unknown Sources"
-   - Check FileProvider configuration
-   - Verify INSTALL_PACKAGES permission
+   - Enable "Install from Unknown Sources" in device settings
+   - Verify FileProvider configuration in AndroidManifest.xml
+   - Check `REQUEST_INSTALL_PACKAGES` permission
 
-3. **iOS App Store redirect fails**
-   - Verify correct App Store ID
-   - Check bundle identifier matches
-   - Ensure app is published
+3. **Flexible update not working**
+   - Ensure Google Play In-App Updates dependency is added
+   - Test with internal testing track, not debug builds
+   - Verify minimum API level 21
+
+#### iOS Issues
+
+1. **App Store redirect fails**
+   - Verify correct bundle identifier
+   - Ensure app is published on App Store
+   - Check network connectivity
+
+2. **Enterprise distribution issues**
+   - Verify enterprise certificate validity
+   - Check device management profile
+   - Ensure IPA is properly signed
 
 ### Debug Mode
 
-Enable debug output:
+Enable detailed logging:
 
 ```dart
 InAppUpdateMe().initialize(UpdateConfig(
   // ... other config
-  debugMode: true, // This would show debug logs
+  showProgressDialog: true,
+  // Add custom logging in listeners
+));
+
+InAppUpdateMe().setUpdateListener(DefaultUpdateListener(
+  onProgress: (progress) => print('🔄 Download: $progress%'),
+  onDownloaded: () => print('✅ Download complete'),
+  onInstalled: () => print('🎉 Installation complete'),
+  onFailed: (error) => print('❌ Error: $error'),
 ));
 ```
 
-## Contributing
+## 📖 Example App
+
+The plugin includes a comprehensive example app that demonstrates all features:
+
+```bash
+cd example
+flutter run
+```
+
+Features demonstrated:
+- ✅ Store update checking
+- ✅ Direct update checking
+- ✅ Force update dialogs
+- ✅ Progress tracking
+- ✅ Error handling
+- ✅ Different update scenarios
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## 💝 Support the Project
 
-- 📧 Email: support@example.com
-- 🐛 Issues: [GitHub Issues](https://github.com/your-username/in_app_update_me/issues)
-- 📖 Documentation: [API Docs](https://pub.dev/documentation/in_app_update_me/)
+If this plugin helped you, consider buying me a coffee! ☕
 
-## Examples
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-atishpaul-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/atishpaul)
 
-Check out the [example](example/) directory for a complete working example demonstrating all features of the plugin.
+## 🏢 About Flenco
 
-## Changelog
+This plugin is created and maintained by **Flenco**, a software development company specializing in mobile app development.
 
-See [CHANGELOG.md](CHANGELOG.md) for version history and changes.
+**Website**: [https://flenco.in](https://flenco.in)
+
+---
+
+## 📚 Additional Resources
+
+- [Complete Example App](example/) - Full implementation example
+- [Testing Guide](TESTING_GUIDE.md) - Comprehensive testing instructions  
+- [Test Server](test_server/) - Mock server for development testing
+- [Changelog](CHANGELOG.md) - Version history and changes
+
+---
+
+<div align="center">
+  Made with ❤️ by <a href="https://flenco.in">Flenco</a>
+  
+  <img src="https://flenco.in/wp-content/uploads/2023/09/cropped-flenco-2023.png" alt="Flenco Logo" height="40" />
+</div>
