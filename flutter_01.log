@@ -1,0 +1,87 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter analyze
+
+## exception
+
+_Exception: Exception: analysis server exited with code 64 and output:
+[stderr] 
+[stderr] Project
+[stderr]   compile    Compile Dart to various formats.
+[stderr]   create     Create a new Dart project.
+[stderr]   pub        Work with packages.
+[stderr]   run        Run a Dart program.
+[stderr]   test       Run tests for a project.
+[stderr] 
+[stderr] Source code
+[stderr]   analyze    Analyze Dart code in a directory.
+[stderr]   doc        Generate API documentation for Dart projects.
+[stderr]   fix        Apply automated fixes to Dart source code.
+[stderr]   format     Idiomatically format Dart source code.
+[stderr] 
+[stderr] Tools
+[stderr]   devtools   Open DevTools (optionally connecting to an existing application).
+[stderr]   info       Show diagnostic information about the installed tooling.
+[stderr] 
+[stderr] Run "dart help <command>" for more information about a command.
+[stderr] See https://dart.dev/tools/dart-tool for detailed documentation.
+
+```
+```
+
+## flutter doctor
+
+```
+[✓] Flutter (Channel stable, 3.35.1, on macOS 15.6.1 24G90 darwin-arm64, locale en-IN) [156ms]
+    • Flutter version 3.35.1 on channel stable at /Users/atishpaul/development/flutter
+    • Upstream repository https://github.com/flutter/flutter.git
+    • Framework revision 20f8274939 (3 weeks ago), 2025-08-14 10:53:09 -0700
+    • Engine revision 1e9a811bf8
+    • Dart version 3.9.0
+    • DevTools version 2.48.0
+    • Feature flags: enable-web, enable-linux-desktop, enable-macos-desktop, enable-windows-desktop, enable-android, enable-ios, cli-animations, enable-lldb-debugging
+
+[✓] Android toolchain - develop for Android devices (Android SDK version 36.0.0) [785ms]
+    • Android SDK at /Users/atishpaul/Library/Android/sdk
+    • Emulator version 36.1.9.0 (build_id 13823996) (CL:N/A)
+    • Platform android-36, build-tools 36.0.0
+    • ANDROID_HOME = /Users/atishpaul/Library/Android/sdk
+    • Java binary at: /Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java
+      This is the JDK bundled with the latest Android Studio installation on this machine.
+      To manually set the JDK path, use: `flutter config --jdk-dir="path/to/jdk"`.
+    • Java version OpenJDK Runtime Environment (build 21.0.6+-13391695-b895.109)
+    • All Android licenses accepted.
+
+[✓] Xcode - develop for iOS and macOS (Xcode 16.4) [1,048ms]
+    • Xcode at /Applications/Xcode.app/Contents/Developer
+    • Build 16F6
+    • CocoaPods version 1.16.2
+
+[✓] Chrome - develop for the web [4ms]
+    • Chrome at /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+
+[✓] Android Studio (version 2025.1) [4ms]
+    • Android Studio at /Applications/Android Studio.app/Contents
+    • Flutter plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/9212-flutter
+    • Dart plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/6351-dart
+    • Java version OpenJDK Runtime Environment (build 21.0.6+-13391695-b895.109)
+
+[✓] VS Code (version 1.103.2) [3ms]
+    • VS Code at /Applications/Visual Studio Code.app/Contents
+    • Flutter extension version 3.116.0
+
+[✓] Connected device (3 available) [5.8s]
+    • Atish’s iPhone (wireless) (mobile) • 00008120-001E10C83E9BC01E • ios            • iOS 26.0 23A5318f
+    • macOS (desktop)                    • macos                     • darwin-arm64   • macOS 15.6.1 24G90 darwin-arm64
+    • Chrome (web)                       • chrome                    • web-javascript • Google Chrome 139.0.7258.155
+
+[✓] Network resources [1,499ms]
+    • All expected network resources are available.
+
+• No issues found!
+```
