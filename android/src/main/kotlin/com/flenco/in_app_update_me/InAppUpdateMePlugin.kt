@@ -1,4 +1,4 @@
-package com.example.in_app_update_me
+package com.flenco.in_app_update_me
 
 import android.app.Activity
 import android.content.Context
@@ -350,3 +350,5 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
     activity = null
   }
 }
+
+

@@ -73,6 +73,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Analytics integration
 - Automated testing framework
 
+## [1.0.2] - 2025-09-05
+
+### Changed
+- Android package/namespace updated to `com.flenco.in_app_update_me`.
+
 ## [1.0.1] - 2025-09-05
 
 ### Fixed
