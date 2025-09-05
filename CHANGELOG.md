@@ -73,6 +73,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Analytics integration
 - Automated testing framework
 
+## [1.1.1] - 2025-09-05
+
+### Fixed
+- **Swift Compiler Error**: Fixed "Invalid redeclaration of 'isFlexibleUpdateDownloading()'" by renaming function to `checkFlexibleUpdateDownloading()`
+- Resolved naming conflict between property and method in iOS Swift implementation
+
 ## [1.1.0] - 2025-09-05
 
 ### Added

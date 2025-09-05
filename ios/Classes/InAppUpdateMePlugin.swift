@@ -335,7 +335,7 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
         return downloadedFileURL != nil && !isFlexibleUpdateDownloading
     }
     
-    func isFlexibleUpdateDownloading() -> Bool {
+    func checkFlexibleUpdateDownloading() -> Bool {
         return isFlexibleUpdateDownloading
     }
     
