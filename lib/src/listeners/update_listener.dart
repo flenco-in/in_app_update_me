@@ -21,6 +21,14 @@ abstract class AppUpdateListener extends UpdateListener {
   @override
   void onUpdateResult(String result) {}
 
+  /// Called when update download is started (iOS)
+  @override
+  void onUpdateDownloadStarted() {}
+
+  /// Called when update installation is started (iOS)
+  @override
+  void onUpdateInstallStarted() {}
+
   /// Called when update check is completed
   void onUpdateCheckCompleted(bool updateAvailable) {}
 
@@ -40,6 +48,8 @@ class DefaultUpdateListener extends AppUpdateListener {
   final Function(bool)? onCheckCompleted;
   final Function()? onCancelled;
   final Function()? onNotAvailable;
+  final Function()? onDownloadStarted;
+  final Function()? onInstallStarted;
 
   DefaultUpdateListener({
     this.onDownloaded,
@@ -50,6 +60,8 @@ class DefaultUpdateListener extends AppUpdateListener {
     this.onCheckCompleted,
     this.onCancelled,
     this.onNotAvailable,
+    this.onDownloadStarted,
+    this.onInstallStarted,
   });
 
   @override
@@ -104,5 +116,15 @@ class DefaultUpdateListener extends AppUpdateListener {
   @override
   void onUpdateNotAvailable() {
     onNotAvailable?.call();
+  }
+
+  @override
+  void onUpdateDownloadStarted() {
+    onDownloadStarted?.call();
+  }
+
+  @override
+  void onUpdateInstallStarted() {
+    onInstallStarted?.call();
   }
 }

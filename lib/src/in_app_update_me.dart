@@ -62,10 +62,13 @@ class InAppUpdateMe {
     }
   }
 
-  /// Start a flexible update (Android only, iOS will redirect to App Store)
-  Future<bool> startFlexibleUpdate() async {
+  /// Start a flexible update
+  /// For Android: Uses Google Play In-App Updates
+  /// For iOS: Downloads update in background (for enterprise/ad-hoc apps)
+  /// [downloadUrl]: Required for iOS direct updates, optional for Android
+  Future<bool> startFlexibleUpdate({String? downloadUrl}) async {
     try {
-      return await _platform.startFlexibleUpdate();
+      return await _platform.startFlexibleUpdate(downloadUrl: downloadUrl);
     } catch (e) {
       if (kDebugMode) {
         print('Error starting flexible update: $e');

@@ -84,6 +84,16 @@ class _MyHomePageState extends State<MyHomePage> {
             SnackBar(content: Text('Update result: $result')),
           );
         },
+        onDownloadStarted: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('iOS: Download started in background')),
+          );
+        },
+        onInstallStarted: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('iOS: Install started')),
+          );
+        },
       ),
     );
   }
@@ -207,7 +217,11 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _startFlexibleUpdate() async {
     if (_lastUpdateInfo?.flexibleUpdateAllowed == true) {
-      final success = await _inAppUpdate.startFlexibleUpdate();
+      // For iOS enterprise/ad-hoc apps, pass the download URL
+      final downloadUrl = _lastUpdateInfo?.downloadUrl;
+      final success = await _inAppUpdate.startFlexibleUpdate(
+        downloadUrl: downloadUrl,
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -241,6 +255,19 @@ class _MyHomePageState extends State<MyHomePage> {
         const SnackBar(content: Text('Immediate update not available')),
       );
     }
+  }
+
+  Future<void> _completeFlexibleUpdate() async {
+    final success = await _inAppUpdate.completeFlexibleUpdate();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success 
+              ? 'Flexible update completed' 
+              : 'Failed to complete flexible update'
+        ),
+      ),
+    );
   }
 
   Future<void> _openStore() async {
@@ -341,6 +368,11 @@ class _MyHomePageState extends State<MyHomePage> {
                         ? _startImmediateUpdate 
                         : null,
                     child: const Text('Start Immediate Update'),
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: _completeFlexibleUpdate,
+                    child: const Text('Complete Flexible Update'),
                   ),
                   const SizedBox(height: 8),
                   ElevatedButton(

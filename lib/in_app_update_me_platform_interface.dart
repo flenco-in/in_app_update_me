@@ -26,7 +26,7 @@ abstract class InAppUpdateMePlatform extends PlatformInterface {
     throw UnimplementedError('checkForUpdate() has not been implemented.');
   }
 
-  Future<bool> startFlexibleUpdate() {
+  Future<bool> startFlexibleUpdate({String? downloadUrl}) {
     throw UnimplementedError('startFlexibleUpdate() has not been implemented.');
   }
 
@@ -98,4 +98,6 @@ abstract class UpdateListener {
   void onUpdateFailed(String error);
   void onUpdateProgress(int progress);
   void onUpdateResult(String result);
+  void onUpdateDownloadStarted();
+  void onUpdateInstallStarted();
 }

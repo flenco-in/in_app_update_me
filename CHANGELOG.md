@@ -73,6 +73,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Analytics integration
 - Automated testing framework
 
+## [1.1.0] - 2025-09-05
+
+### Added
+- **🎉 iOS Flexible Updates Support** - Major new feature!
+  - Background download support for enterprise and ad-hoc distributed iOS apps
+  - Progress tracking during iOS background downloads
+  - Install prompting when download completes
+  - Full URLSessionDownloadDelegate implementation
+  - New listener events: `onUpdateDownloadStarted()`, `onUpdateInstallStarted()`
+
+### Enhanced
+- **Enhanced `startFlexibleUpdate()` method** - Now accepts optional `downloadUrl` parameter for iOS
+- **Improved iOS implementation** - Better support for enterprise app distribution
+- **Updated example app** - Demonstrates new iOS flexible update capabilities
+- **Enhanced documentation** - Complete README update with iOS flexible update examples
+
+### API Changes
+- `startFlexibleUpdate()` now accepts optional `downloadUrl` parameter
+- Added new listener methods in `UpdateListener` interface
+- Updated platform interface to support iOS flexible updates
+
+### iOS Features
+- Background downloads with progress tracking (enterprise/ad-hoc apps)
+- Install prompting for downloaded updates
+- Support for enterprise certificate validation
+- Ad-hoc distribution compatibility
+- Proper error handling for iOS-specific scenarios
+
+### Documentation
+- Comprehensive README update highlighting iOS flexible update support
+- New troubleshooting section for iOS-specific issues
+- Updated API documentation
+- Enhanced usage examples for both platforms
+
 ## [1.0.2] - 2025-09-05
 
 ### Changed

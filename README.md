@@ -21,7 +21,7 @@
 ✅ **App Store Updates**: App Store redirect and version checking  
 ✅ **Direct Updates**: Download and install APK/IPA files directly  
 ✅ **Force Updates**: Mandatory updates with blocking UI  
-✅ **Flexible Updates**: Background downloads (Android)  
+✅ **Flexible Updates**: Background downloads (Android & iOS)  
 ✅ **Progress Tracking**: Real-time download progress  
 ✅ **Customizable UI**: Pre-built dialogs and widgets  
 ✅ **Priority Levels**: Update importance handling  
@@ -30,10 +30,45 @@
 
 | Platform | Store Updates | Direct Updates | Force Updates | Flexible Updates |
 |----------|---------------|----------------|---------------|------------------|
-| Android  | ✅ Google Play | ✅ APK Download | ✅ | ✅ |
-| iOS      | ✅ App Store   | ✅ Enterprise/TestFlight | ✅ | ❌* |
+| Android  | ✅ Google Play | ✅ APK Download | ✅ | ✅ Background |
+| iOS      | ✅ App Store   | ✅ Enterprise/Ad-hoc | ✅ | ✅ Background* |
 
-*iOS doesn't support flexible updates due to platform limitations
+*iOS flexible updates work for enterprise and ad-hoc distributed apps with background downloads
+
+## 🍎 iOS Flexible Updates
+
+iOS flexible updates are now supported for enterprise and ad-hoc distributed apps! Here's how it works:
+
+### **App Store Apps**
+- Version checking via iTunes API
+- Redirects to App Store for updates
+- No background downloads (Apple restriction)
+
+### **Enterprise/Ad-hoc Apps**
+- ✅ Background downloads with progress tracking
+- ✅ Install prompting when download completes
+- ✅ Works with internal distribution and TestFlight
+- ✅ Full flexible update experience like Android
+
+### **Usage Example for iOS Enterprise Apps**
+```dart
+// Check for enterprise app update
+final updateInfo = await InAppUpdateMe().checkForUpdate(
+  useStore: false,
+  updateUrl: 'https://your-enterprise-server.com/api/version',
+);
+
+if (updateInfo?.flexibleUpdateAllowed == true) {
+  // Start background download
+  await InAppUpdateMe().startFlexibleUpdate(
+    downloadUrl: updateInfo?.downloadUrl,
+  );
+  
+  // User continues using app while download happens
+  // When ready, complete the installation
+  await InAppUpdateMe().completeFlexibleUpdate();
+}
+```
 
 ## 📦 Installation
 
@@ -85,6 +120,8 @@ class _MyAppState extends State<MyApp> {
       onDownloaded: () => print('Update downloaded'),
       onInstalled: () => print('Update installed'),
       onFailed: (error) => print('Update failed: $error'),
+      onDownloadStarted: () => print('iOS: Background download started'),
+      onInstallStarted: () => print('iOS: Installation started'),
     ));
   }
 
@@ -126,7 +163,27 @@ Future<void> _performForceUpdateCheck() async {
 }
 ```
 
-### 3. Direct Updates (APK/IPA)
+### 3. Flexible Updates (Android & iOS)
+
+```dart
+Future<void> _startFlexibleUpdate() async {
+  final updateInfo = await _inAppUpdate.checkForUpdate();
+  
+  if (updateInfo?.flexibleUpdateAllowed == true) {
+    // Android: Uses Google Play In-App Updates
+    // iOS: Downloads in background for enterprise/ad-hoc apps
+    await _inAppUpdate.startFlexibleUpdate(
+      downloadUrl: updateInfo?.downloadUrl, // Required for iOS direct updates
+    );
+    
+    // User can continue using the app while update downloads
+    // Complete installation when ready
+    await _inAppUpdate.completeFlexibleUpdate();
+  }
+}
+```
+
+### 4. Direct Updates (APK/IPA)
 
 ```dart
 Future<void> _checkDirectUpdate() async {
@@ -201,8 +258,12 @@ Create `android/app/src/main/res/xml/file_paths.xml`:
 platform :ios, '11.0'
 ```
 
-2. **App Store Connect**: Ensure your app is published on App Store for store updates
-3. **Enterprise Distribution**: For direct updates, use enterprise distribution or TestFlight
+2. **App Store Updates**: Ensure your app is published on App Store Connect
+3. **Enterprise/Ad-hoc Updates**: For flexible updates and direct installations:
+   - Use Apple Enterprise Developer Program for enterprise distribution
+   - Use Ad-hoc distribution for testing with limited devices
+   - Configure proper provisioning profiles and certificates
+4. **Background App Refresh**: Enable for background downloads (optional)
 
 ## 🎯 Complete Usage Guide
 
@@ -275,8 +336,8 @@ UpdateProgressDialog.show(
 |--------|-------------|-----------|
 | `initialize(UpdateConfig config)` | Initialize the plugin with configuration | Android, iOS |
 | `checkForUpdate({bool useStore, String? updateUrl, String? currentVersion})` | Check for available updates | Android, iOS |
-| `startFlexibleUpdate()` | Start flexible update | Android only |
-| `startImmediateUpdate()` | Start immediate update | Android only |
+| `startFlexibleUpdate({String? downloadUrl})` | Start flexible update with optional download URL | Android, iOS |
+| `startImmediateUpdate()` | Start immediate update | Android, iOS |
 | `downloadAndInstallUpdate(String downloadUrl)` | Download and install update directly | Android, iOS |
 | `openStore()` | Open Play Store or App Store manually | Android, iOS |
 | `performUpdateCheck(UpdateConfig config)` | Complete update check with configuration | Android, iOS |
@@ -304,6 +365,14 @@ _inAppUpdate.setUpdateListener(DefaultUpdateListener(
   onResult: (result) {
     // Update flow result (success, cancelled, failed)
     print('Update result: $result');
+  },
+  onDownloadStarted: () {
+    // iOS: Background download started
+    print('iOS: Download started in background');
+  },
+  onInstallStarted: () {
+    // iOS: Installation process started
+    print('iOS: Installation started');
   },
 ));
 ```
@@ -333,27 +402,38 @@ Returns the APK/IPA file with appropriate headers:
 - `Content-Type: application/vnd.android.package-archive` (for APK)
 - `Content-Disposition: attachment; filename="app.apk"`
 
-### Background Updates (Android)
+### Background Updates (Android & iOS)
 
 ```dart
 class BackgroundUpdateService {
   static Future<void> startBackgroundUpdate() async {
     final inAppUpdate = InAppUpdateMe();
     
-    // Set up listener for background updates
-    inAppUpdate.setUpdateListener(DefaultUpdateListener(
-      onDownloaded: () async {
-        // Update downloaded in background
-        // Show notification to user
-        showUpdateReadyNotification();
-      },
-      onFailed: (error) {
-        print('Background update failed: $error');
-      },
-    ));
+    // Check for updates first
+    final updateInfo = await inAppUpdate.checkForUpdate();
+    
+    if (updateInfo?.flexibleUpdateAllowed == true) {
+      // Set up listener for background updates
+      inAppUpdate.setUpdateListener(DefaultUpdateListener(
+        onDownloadStarted: () {
+          // iOS: Background download started
+          print('Background download started');
+        },
+        onDownloaded: () async {
+          // Update downloaded in background
+          showUpdateReadyNotification();
+        },
+        onFailed: (error) {
+          print('Background update failed: $error');
+        },
+      ));
 
-    // Start flexible update
-    await inAppUpdate.startFlexibleUpdate();
+      // Start flexible update
+      // For iOS enterprise/ad-hoc apps, pass download URL
+      await inAppUpdate.startFlexibleUpdate(
+        downloadUrl: updateInfo?.downloadUrl,
+      );
+    }
   }
 
   static Future<void> completeUpdate() async {
@@ -438,6 +518,12 @@ try {
    - Verify enterprise certificate validity
    - Check device management profile
    - Ensure IPA is properly signed
+
+3. **Flexible update not working on iOS**
+   - Ensure you're using enterprise or ad-hoc distribution (not App Store)
+   - Verify downloadUrl is provided in `startFlexibleUpdate()`
+   - Check that the IPA URL is accessible and properly signed
+   - Test with proper provisioning profiles
 
 ### Debug Mode
 

@@ -34,6 +34,12 @@ class MethodChannelInAppUpdateMe extends InAppUpdateMePlatform {
         final result = call.arguments['result'] ?? 'unknown';
         _listener!.onUpdateResult(result);
         break;
+      case 'onUpdateDownloadStarted':
+        _listener!.onUpdateDownloadStarted();
+        break;
+      case 'onUpdateInstallStarted':
+        _listener!.onUpdateInstallStarted();
+        break;
     }
   }
 
@@ -73,9 +79,12 @@ class MethodChannelInAppUpdateMe extends InAppUpdateMePlatform {
   }
 
   @override
-  Future<bool> startFlexibleUpdate() async {
+  Future<bool> startFlexibleUpdate({String? downloadUrl}) async {
     try {
-      final result = await methodChannel.invokeMethod<bool>('startFlexibleUpdate');
+      final result = await methodChannel.invokeMethod<bool>(
+        'startFlexibleUpdate',
+        downloadUrl != null ? {'downloadUrl': downloadUrl} : null,
+      );
       return result ?? false;
     } catch (e) {
       if (kDebugMode) {

@@ -23,7 +23,7 @@ class MockInAppUpdateMePlatform
   ));
 
   @override
-  Future<bool> startFlexibleUpdate() => Future.value(true);
+  Future<bool> startFlexibleUpdate({String? downloadUrl}) => Future.value(true);
 
   @override
   Future<bool> startImmediateUpdate() => Future.value(true);
@@ -42,6 +42,7 @@ class MockInAppUpdateMePlatform
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   final InAppUpdateMePlatform initialPlatform = InAppUpdateMePlatform.instance;
 
   test('$MethodChannelInAppUpdateMe is the default instance', () {

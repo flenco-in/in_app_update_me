@@ -2,14 +2,27 @@ import Flutter
 import UIKit
 import Foundation
 
-public class InAppUpdateMePlugin: NSObject, FlutterPlugin {
+public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDelegate {
     private var channel: FlutterMethodChannel?
+    private var downloadTask: URLSessionDownloadTask?
+    private var urlSession: URLSession?
+    private var downloadedFileURL: URL?
+    private var isFlexibleUpdateDownloading = false
+    private var flexibleUpdateInfo: [String: Any]?
     
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "in_app_update_me", binaryMessenger: registrar.messenger())
         let instance = InAppUpdateMePlugin()
         instance.channel = channel
+        instance.setupURLSession()
         registrar.addMethodCallDelegate(instance, channel: channel)
+    }
+    
+    private func setupURLSession() {
+        let config = URLSessionConfiguration.background(withIdentifier: "in_app_update_me.download")
+        config.allowsCellularAccess = true
+        config.isDiscretionary = false
+        urlSession = URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }
     
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -83,7 +96,9 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin {
                     "updateAvailable": updateAvailable,
                     "appStoreVersion": appStoreVersion,
                     "currentVersion": currentVersion,
-                    "appStoreUrl": "https://apps.apple.com/app/id\(appInfo["trackId"] as? Int64 ?? 0)"
+                    "appStoreUrl": "https://apps.apple.com/app/id\(appInfo["trackId"] as? Int64 ?? 0)",
+                    "flexibleUpdateAllowed": false,
+                    "immediateUpdateAllowed": true
                 ])
             }
         }.resume()
@@ -106,16 +121,47 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin {
                     "updateAvailable": true,
                     "directUpdate": true,
                     "downloadUrl": updateUrl,
-                    "currentVersion": currentVersion
+                    "currentVersion": currentVersion,
+                    "flexibleUpdateAllowed": true,
+                    "immediateUpdateAllowed": true
                 ])
             }
         }.resume()
     }
     
     private func startFlexibleUpdate(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        // iOS doesn't support flexible updates like Android
-        // We'll redirect to App Store for updates
-        redirectToAppStore(result: result)
+        guard let args = call.arguments as? [String: Any],
+              let downloadUrl = args["downloadUrl"] as? String else {
+            // For App Store updates, we can't do flexible updates
+            redirectToAppStore(result: result)
+            return
+        }
+        
+        // For direct updates (enterprise/ad-hoc apps), we can download in background
+        startFlexibleDownload(downloadUrl: downloadUrl, result: result)
+    }
+    
+    private func startFlexibleDownload(downloadUrl: String, result: @escaping FlutterResult) {
+        guard let url = URL(string: downloadUrl) else {
+            result(FlutterError(code: "INVALID_URL", message: "Invalid download URL", details: nil))
+            return
+        }
+        
+        // Cancel any existing download
+        downloadTask?.cancel()
+        
+        // Start background download
+        downloadTask = urlSession?.downloadTask(with: url)
+        isFlexibleUpdateDownloading = true
+        flexibleUpdateInfo = ["downloadUrl": downloadUrl]
+        
+        downloadTask?.resume()
+        result(true)
+        
+        // Notify Flutter about download started
+        DispatchQueue.main.async { [weak self] in
+            self?.channel?.invokeMethod("onUpdateDownloadStarted", arguments: nil)
+        }
     }
     
     private func startImmediateUpdate(call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -125,8 +171,36 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin {
     }
     
     private func completeFlexibleUpdate(result: @escaping FlutterResult) {
-        // iOS doesn't support flexible updates
-        result(FlutterError(code: "NOT_SUPPORTED", message: "Flexible updates not supported on iOS", details: nil))
+        guard let fileURL = downloadedFileURL else {
+            result(FlutterError(code: "NO_DOWNLOAD", message: "No downloaded update available", details: nil))
+            return
+        }
+        
+        // For iOS, we can't silently install like Android
+        // Instead, we'll open the downloaded IPA/enterprise app URL
+        if fileURL.pathExtension.lowercased() == "ipa" || 
+           fileURL.absoluteString.contains("itms-services") {
+            
+            DispatchQueue.main.async {
+                if UIApplication.shared.canOpenURL(fileURL) {
+                    UIApplication.shared.open(fileURL) { success in
+                        if success {
+                            result(true)
+                            // Notify Flutter about installation started
+                            DispatchQueue.main.async { [weak self] in
+                                self?.channel?.invokeMethod("onUpdateInstallStarted", arguments: nil)
+                            }
+                        } else {
+                            result(FlutterError(code: "INSTALL_FAILED", message: "Cannot install update", details: nil))
+                        }
+                    }
+                } else {
+                    result(FlutterError(code: "CANNOT_OPEN", message: "Cannot open update file", details: nil))
+                }
+            }
+        } else {
+            result(FlutterError(code: "INVALID_FILE", message: "Invalid update file format", details: nil))
+        }
     }
     
     private func downloadAndInstallIPA(call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -205,5 +279,70 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin {
         }
         
         return false
+    }
+    
+    // MARK: - URLSessionDownloadDelegate
+    
+    public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        // Move downloaded file to a permanent location
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let destinationURL = documentsPath.appendingPathComponent("in_app_update.ipa")
+        
+        do {
+            // Remove existing file if it exists
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+            
+            // Move downloaded file to permanent location
+            try FileManager.default.moveItem(at: location, to: destinationURL)
+            
+            downloadedFileURL = destinationURL
+            isFlexibleUpdateDownloading = false
+            
+            // Notify Flutter about download completion
+            DispatchQueue.main.async { [weak self] in
+                self?.channel?.invokeMethod("onUpdateDownloaded", arguments: nil)
+            }
+            
+        } catch {
+            DispatchQueue.main.async { [weak self] in
+                self?.channel?.invokeMethod("onUpdateFailed", arguments: ["error": "Failed to save downloaded file: \(error.localizedDescription)"])
+            }
+        }
+    }
+    
+    public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        let progress = totalBytesExpectedToWrite > 0 ? Int((Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)) * 100) : 0
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.channel?.invokeMethod("onUpdateProgress", arguments: ["progress": progress])
+        }
+    }
+    
+    public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didCompleteWithError error: Error?) {
+        if let error = error {
+            isFlexibleUpdateDownloading = false
+            DispatchQueue.main.async { [weak self] in
+                self?.channel?.invokeMethod("onUpdateFailed", arguments: ["error": "Download failed: \(error.localizedDescription)"])
+            }
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    func isFlexibleUpdateAvailable() -> Bool {
+        return downloadedFileURL != nil && !isFlexibleUpdateDownloading
+    }
+    
+    func isFlexibleUpdateDownloading() -> Bool {
+        return isFlexibleUpdateDownloading
+    }
+    
+    func cancelFlexibleUpdate() {
+        downloadTask?.cancel()
+        isFlexibleUpdateDownloading = false
+        downloadedFileURL = nil
+        flexibleUpdateInfo = nil
     }
 }
