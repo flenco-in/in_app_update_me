@@ -72,3 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Additional UI customization options
 - Analytics integration
 - Automated testing framework
+
+## [1.0.1] - 2025-09-05
+
+### Fixed
+- Add Android Gradle namespace to `android/build.gradle` to satisfy AGP 7.3+/8+ and fix build failure when used in client apps. No API changes.
