@@ -7,8 +7,8 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
     private var downloadTask: URLSessionDownloadTask?
     private var urlSession: URLSession?
     private var downloadedFileURL: URL?
-    private var isFlexibleUpdateDownloading = false
     private var flexibleUpdateInfo: [String: Any]?
+    private var lastReportedProgress = -1
     
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "in_app_update_me", binaryMessenger: registrar.messenger())
@@ -81,10 +81,20 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
                 }
                 
                 guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-                      let results = json["results"] as? [[String: Any]],
-                      let appInfo = results.first else {
+                      let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
                     result(FlutterError(code: "PARSE_ERROR", message: "Cannot parse App Store response", details: nil))
+                    return
+                }
+
+                let results = json["results"] as? [[String: Any]] ?? []
+                guard let appInfo = results.first else {
+                    // App not found — either not published yet or wrong bundle id.
+                    result([
+                        "updateAvailable": false,
+                        "currentVersion": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
+                        "immediateUpdateAllowed": false,
+                        "flexibleUpdateAllowed": false
+                    ])
                     return
                 }
                 
@@ -147,19 +157,27 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
             result(FlutterError(code: "INVALID_URL", message: "Invalid download URL", details: nil))
             return
         }
-        
-        // Cancel any existing download
+
+        // itms-services:// is Apple's OTA install scheme — it must be handed
+        // directly to the OS; downloading the IPA ourselves won't work because
+        // iOS refuses to install arbitrary IPA files from a file:// path.
+        if downloadUrl.hasPrefix("itms-services://") {
+            flexibleUpdateInfo = ["downloadUrl": downloadUrl]
+            result(true)
+            DispatchQueue.main.async { [weak self] in
+                self?.channel?.invokeMethod("onUpdateDownloadStarted", arguments: nil)
+            }
+            return
+        }
+
+        // For other URLs, download in the background (e.g., enterprise manifest
+        // plist served via https that the system will open via itms-services).
         downloadTask?.cancel()
-        
-        // Start background download
         downloadTask = urlSession?.downloadTask(with: url)
-        isFlexibleUpdateDownloading = true
         flexibleUpdateInfo = ["downloadUrl": downloadUrl]
-        
+        lastReportedProgress = -1
         downloadTask?.resume()
         result(true)
-        
-        // Notify Flutter about download started
         DispatchQueue.main.async { [weak self] in
             self?.channel?.invokeMethod("onUpdateDownloadStarted", arguments: nil)
         }
@@ -172,36 +190,38 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
     }
     
     private func completeFlexibleUpdate(result: @escaping FlutterResult) {
-        guard let fileURL = downloadedFileURL else {
-            result(FlutterError(code: "NO_DOWNLOAD", message: "No downloaded update available", details: nil))
-            return
-        }
-        
-        // For iOS, we can't silently install like Android
-        // Instead, we'll open the downloaded IPA/enterprise app URL
-        if fileURL.pathExtension.lowercased() == "ipa" || 
-           fileURL.absoluteString.contains("itms-services") {
-            
-            DispatchQueue.main.async {
-                if UIApplication.shared.canOpenURL(fileURL) {
-                    UIApplication.shared.open(fileURL) { success in
-                        if success {
-                            result(true)
-                            // Notify Flutter about installation started
-                            DispatchQueue.main.async { [weak self] in
-                                self?.channel?.invokeMethod("onUpdateInstallStarted", arguments: nil)
-                            }
-                        } else {
-                            result(FlutterError(code: "INSTALL_FAILED", message: "Cannot install update", details: nil))
-                        }
+        // If the update was initiated via an itms-services:// URL, hand it to
+        // the OS now — this triggers Apple's built-in OTA installer.
+        if let storedUrl = flexibleUpdateInfo?["downloadUrl"] as? String,
+           storedUrl.hasPrefix("itms-services://"),
+           let url = URL(string: storedUrl) {
+            DispatchQueue.main.async { [weak self] in
+                UIApplication.shared.open(url) { success in
+                    if success {
+                        self?.channel?.invokeMethod("onUpdateInstallStarted", arguments: nil)
+                        result(true)
+                    } else {
+                        result(FlutterError(code: "INSTALL_FAILED", message: "Cannot open itms-services URL", details: nil))
                     }
-                } else {
-                    result(FlutterError(code: "CANNOT_OPEN", message: "Cannot open update file", details: nil))
                 }
             }
-        } else {
-            result(FlutterError(code: "INVALID_FILE", message: "Invalid update file format", details: nil))
+            return
         }
+
+        // Background-downloaded file is ready — the file is in the Documents
+        // directory but iOS does not allow installing arbitrary IPA files from a
+        // file:// path (App Store policy). Notify Flutter so it can prompt the
+        // user to open the App Store or an itms-services:// link instead.
+        if downloadedFileURL != nil {
+            result(FlutterError(
+                code: "INSTALL_NOT_SUPPORTED",
+                message: "iOS cannot install IPA files directly. Use an itms-services:// URL for enterprise OTA installation.",
+                details: nil
+            ))
+            return
+        }
+
+        result(FlutterError(code: "NO_DOWNLOAD", message: "No downloaded update available. Call startFlexibleUpdate first.", details: nil))
     }
     
     private func downloadAndInstallIPA(call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -333,8 +353,7 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
             try FileManager.default.moveItem(at: location, to: destinationURL)
             
             downloadedFileURL = destinationURL
-            isFlexibleUpdateDownloading = false
-            
+
             // Notify Flutter about download completion
             DispatchQueue.main.async { [weak self] in
                 self?.channel?.invokeMethod("onUpdateDownloaded", arguments: nil)
@@ -349,35 +368,20 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
     
     public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         let progress = totalBytesExpectedToWrite > 0 ? Int((Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)) * 100) : 0
-        
+        // Only forward whole-percent changes to avoid flooding the channel.
+        guard progress != lastReportedProgress else { return }
+        lastReportedProgress = progress
+
         DispatchQueue.main.async { [weak self] in
             self?.channel?.invokeMethod("onUpdateProgress", arguments: ["progress": progress])
         }
     }
-    
+
     public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didCompleteWithError error: Error?) {
         if let error = error {
-            isFlexibleUpdateDownloading = false
             DispatchQueue.main.async { [weak self] in
                 self?.channel?.invokeMethod("onUpdateFailed", arguments: ["error": "Download failed: \(error.localizedDescription)"])
             }
         }
-    }
-    
-    // MARK: - Helper Methods
-    
-    func isFlexibleUpdateAvailable() -> Bool {
-        return downloadedFileURL != nil && !isFlexibleUpdateDownloading
-    }
-    
-    func checkFlexibleUpdateDownloading() -> Bool {
-        return isFlexibleUpdateDownloading
-    }
-    
-    func cancelFlexibleUpdate() {
-        downloadTask?.cancel()
-        isFlexibleUpdateDownloading = false
-        downloadedFileURL = nil
-        flexibleUpdateInfo = nil
     }
 }

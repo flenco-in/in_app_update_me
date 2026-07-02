@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2026-07-03
+
+### Fixed
+- **Dart**: `removeUpdateListener()` now actually detaches the listener from the method channel — previously native callbacks kept firing after removal.
+- **Dart**: `initialize()` no longer replaces a listener already registered via `setUpdateListener()`.
+- **Android**: User-cancelled flexible download (`InstallStatus.CANCELED`) is now reported via `onUpdateResult("cancelled")` instead of being silently ignored.
+- **Android**: `startImmediateUpdate()` now resumes an interrupted immediate update (`DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS`) as required by Play policy, instead of failing with `UPDATE_NOT_AVAILABLE`.
+- **Android/iOS**: Download progress callbacks are throttled to whole-percent changes — previously fired per chunk, flooding the platform channel and UI thread on large downloads.
+- **Android**: Background download/check coroutines now run in a plugin-scoped `CoroutineScope` that is cancelled in `onDetachedFromEngine`, so no work leaks past engine detach.
+- **iOS**: Removed dead helper methods (`isFlexibleUpdateAvailable`, `checkFlexibleUpdateDownloading`, `cancelFlexibleUpdate`) and unused download-state tracking.
+- **Android**: `completeFlexibleUpdate()` no longer hangs the Dart Future indefinitely when `AppUpdateManager` is not yet initialised — now returns an error immediately.
+- **Android**: `installStateUpdatedListener` is unregistered before re-registering in `startFlexibleUpdate` to prevent duplicate callbacks on repeated calls.
+- **Android**: Removed unused `responseBody` dead code in `checkDirectUpdate`.
+- **Android**: Removed unused `pendingResult` field.
+- **iOS**: `startFlexibleUpdate` with an `itms-services://` URL now opens it directly via the OS instead of attempting to download it (downloading an IPA and opening it via a `file://` path is blocked by iOS security policy).
+- **iOS**: `completeFlexibleUpdate` now correctly triggers the OTA installer via the stored `itms-services://` URL; previously the `itms-services://` check ran against a local `file://` path (dead branch — always false) and installation always failed with `CANNOT_OPEN`.
+- **iOS**: `checkAppStoreUpdate` with an app not yet published on the App Store now returns `updateAvailable: false` instead of a misleading `PARSE_ERROR`.
+
+### Changed
+- README rewritten: accurate platform behaviour table, correct iOS enterprise OTA flow, AppDelegate hook requirement documented, removed references to non-existent `TESTING_GUIDE.md` and `test_server/`.
+
 ## [1.1.2] - 2026-07-03
 
 ### Fixed

@@ -39,6 +39,9 @@ class MockInAppUpdateMePlatform
 
   @override
   void setUpdateListener(UpdateListener listener) {}
+
+  @override
+  void removeUpdateListener() {}
 }
 
 void main() {

@@ -18,7 +18,8 @@ class InAppUpdateMe {
 
   /// Initialize the plugin with configuration
   void initialize(UpdateConfig config) {
-    _updateListener = DefaultUpdateListener();
+    // Don't clobber a listener the developer already registered.
+    _updateListener ??= DefaultUpdateListener();
     _platform.setUpdateListener(_updateListener!);
   }
 
@@ -163,6 +164,7 @@ class InAppUpdateMe {
   /// Remove update listener
   void removeUpdateListener() {
     _updateListener = null;
+    _platform.removeUpdateListener();
   }
 
   /// Convenience method to perform a complete update check and handle force updates

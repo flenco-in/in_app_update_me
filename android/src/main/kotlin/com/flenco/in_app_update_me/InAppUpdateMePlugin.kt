@@ -36,24 +36,34 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
   private var activity: Activity? = null
   private var appUpdateManager: AppUpdateManager? = null
   private val updateRequestCode = 100
-  private var pendingResult: Result? = null
-  
+  private val pluginScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+  private var lastReportedProgress = -1
   private val installStateUpdatedListener = InstallStateUpdatedListener { state ->
     when (state.installStatus()) {
       InstallStatus.DOWNLOADED -> {
+        lastReportedProgress = -1
         channel.invokeMethod("onUpdateDownloaded", null)
       }
       InstallStatus.INSTALLED -> {
         channel.invokeMethod("onUpdateInstalled", null)
       }
       InstallStatus.FAILED -> {
+        lastReportedProgress = -1
         channel.invokeMethod("onUpdateFailed", mapOf("error" to "Installation failed"))
+      }
+      InstallStatus.CANCELED -> {
+        lastReportedProgress = -1
+        channel.invokeMethod("onUpdateResult", mapOf("result" to "cancelled"))
       }
       InstallStatus.DOWNLOADING -> {
         val progress = if (state.totalBytesToDownload() > 0) {
           (state.bytesDownloaded().toDouble() / state.totalBytesToDownload().toDouble() * 100).toInt()
         } else 0
-        channel.invokeMethod("onUpdateProgress", mapOf("progress" to progress))
+        // Only forward whole-percent changes to avoid flooding the channel.
+        if (progress != lastReportedProgress) {
+          lastReportedProgress = progress
+          channel.invokeMethod("onUpdateProgress", mapOf("progress" to progress))
+        }
       }
     }
   }
@@ -121,7 +131,7 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
   }
 
   private fun checkDirectUpdate(updateUrl: String, currentVersion: String, result: Result) {
-    CoroutineScope(Dispatchers.IO).launch {
+    pluginScope.launch {
       try {
         val client = OkHttpClient()
         val request = Request.Builder().url(updateUrl).build()
@@ -134,7 +144,6 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
             return@launch
           }
 
-          val responseBody = response.body?.string()
           withContext(Dispatchers.Main) {
             result.success(mapOf(
               "updateAvailable" to true,
@@ -162,8 +171,10 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
       appUpdateManager = AppUpdateManagerFactory.create(context)
     }
 
+    // Unregister first to avoid duplicate callbacks if called multiple times.
+    appUpdateManager?.unregisterListener(installStateUpdatedListener)
     appUpdateManager?.registerListener(installStateUpdatedListener)
-    
+
     appUpdateManager?.appUpdateInfo?.addOnSuccessListener { appUpdateInfo ->
       if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
           appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {
@@ -198,9 +209,13 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
     }
 
     appUpdateManager?.appUpdateInfo?.addOnSuccessListener { appUpdateInfo ->
-      if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
+      val availability = appUpdateInfo.updateAvailability()
+      // DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS: an immediate update was
+      // interrupted (e.g. app backgrounded); Play requires resuming the flow.
+      if ((availability == UpdateAvailability.UPDATE_AVAILABLE ||
+           availability == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) &&
           appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
-        
+
         try {
           appUpdateManager?.startUpdateFlowForResult(
             appUpdateInfo,
@@ -221,11 +236,13 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
   }
 
   private fun completeFlexibleUpdate(result: Result) {
-    appUpdateManager?.completeUpdate()?.addOnSuccessListener {
-      result.success(true)
-    }?.addOnFailureListener { exception ->
-      result.error("COMPLETE_UPDATE_FAILED", exception.message, null)
+    if (appUpdateManager == null) {
+      result.error("NOT_AVAILABLE", "No active update session. Call startFlexibleUpdate first.", null)
+      return
     }
+    appUpdateManager!!.completeUpdate()
+      .addOnSuccessListener { result.success(true) }
+      .addOnFailureListener { exception -> result.error("COMPLETE_UPDATE_FAILED", exception.message, null) }
   }
 
   private fun downloadAndInstallApk(call: MethodCall, result: Result) {
@@ -235,11 +252,11 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
       return
     }
 
-    CoroutineScope(Dispatchers.IO).launch {
+    pluginScope.launch {
       try {
         val client = OkHttpClient()
         val request = Request.Builder().url(downloadUrl).build()
-        
+
         client.newCall(request).execute().use { response ->
           if (!response.isSuccessful) {
             withContext(Dispatchers.Main) {
@@ -256,6 +273,7 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
               val buffer = ByteArray(8192)
               var bytesRead: Int
               var totalBytesRead = 0L
+              var lastProgress = -1
 
               while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                 fos.write(buffer, 0, bytesRead)
@@ -263,8 +281,13 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
 
                 if (totalSize > 0) {
                   val progress = (totalBytesRead.toDouble() / totalSize.toDouble() * 100).toInt()
-                  withContext(Dispatchers.Main) {
-                    channel.invokeMethod("onUpdateProgress", mapOf("progress" to progress))
+                  // Only cross the channel on whole-percent changes; per-8KB
+                  // callbacks would flood the UI thread on large APKs.
+                  if (progress != lastProgress) {
+                    lastProgress = progress
+                    withContext(Dispatchers.Main) {
+                      channel.invokeMethod("onUpdateProgress", mapOf("progress" to progress))
+                    }
                   }
                 }
               }
@@ -337,6 +360,7 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
   override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
     channel.setMethodCallHandler(null)
     appUpdateManager?.unregisterListener(installStateUpdatedListener)
+    pluginScope.cancel()
   }
 
   override fun onAttachedToActivity(binding: ActivityPluginBinding) {

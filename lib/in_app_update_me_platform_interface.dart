@@ -49,6 +49,10 @@ abstract class InAppUpdateMePlatform extends PlatformInterface {
   void setUpdateListener(UpdateListener listener) {
     throw UnimplementedError('setUpdateListener() has not been implemented.');
   }
+
+  void removeUpdateListener() {
+    throw UnimplementedError('removeUpdateListener() has not been implemented.');
+  }
 }
 
 class UpdateInfo {

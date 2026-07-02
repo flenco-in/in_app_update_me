@@ -3,22 +3,28 @@
 *.log
 *.pyc
 *.swp
-.DS_Store
+*.swo
+*~
 .atom/
 .buildlog/
 .history
 .svn/
 migrate_working_dir/
 
-# IntelliJ related
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs and editors
 *.iml
 *.ipr
 *.iws
 .idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
 .vscode/
 
 # Flutter/Dart/Pub related
@@ -30,82 +36,35 @@ migrate_working_dir/
 .packages
 .pub-cache/
 .pub/
-/build/
+build/
+pubspec.lock
 
-# Symbolication related
+# Symbolication / obfuscation
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android
+.gradle/
+.cxx/
+local.properties
+key.properties
+*.jks
+*.keystore
+*.p12
+*.key
 /android/app/debug
 /android/app/profile
 /android/app/release
 
-# Web related
-lib/generated_plugin_registrant.dart
+# iOS / macOS
+Pods/
+.symlinks/
+*.mobileprovision
 
-# Exceptions to above rules.
-!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
-
-# Additional Flutter Plugin specific
-pubspec.lock
-
-# Environment variables
-.env*
-
-# dotenv environment variables file
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Node.js related (for test server)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Test server specific
-test_server/node_modules/
-test_server/downloads/
-test_server/logs/
-
-# Claude Code specific
-.claude/
-*.claude
-claude_*
-
-# IDE and Editor specific
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS specific
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Flutter crash reports
-flutter_*.log
-
-# Coverage reports
-coverage/
-.coverage
-lcov.info
-
-# Generated files
-*.g.dart
-*.freezed.dart
-*.mocks.dart
+# Example app generated files
+example/android/app/src/main/java/io/flutter/plugins/
+example/ios/Runner/GeneratedPluginRegistrant.h
+example/ios/Runner/GeneratedPluginRegistrant.m
 
 # Build outputs
 *.apk
@@ -113,46 +72,24 @@ lcov.info
 *.ipa
 *.app
 
-# Plugin development
-example/ios/.symlinks/
-example/android/.gradle/
-example/android/app/src/main/java/io/flutter/plugins/
+# Coverage
+coverage/
+lcov.info
 
-# Package managers
-.pnpm-debug.log*
-.yarn-integrity
+# Environment variables
+.env
+.env.*
 
-# Firebase
-.firebase/
-firebase-debug.log
-firestore-debug.log
-ui-debug.log
-
-# Temporary files
-*.tmp
-*.temp
-*.bak
-*.swp
-*.swo
-
-# Documentation build
-docs/_build/
-site/
-
-# Testing
-.nyc_output/
-.coverage/
-
-# Local development
-local.properties
-key.properties
-*.jks
-*.p12
-*.key
-*.mobileprovision
+# Claude Code
+.claude/
 
 # Fastlane
 fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots
 fastlane/test_output
+
+# Temporary files
+*.tmp
+*.temp
+*.bak

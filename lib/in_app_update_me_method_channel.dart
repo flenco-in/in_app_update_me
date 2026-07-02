@@ -157,4 +157,9 @@ class MethodChannelInAppUpdateMe extends InAppUpdateMePlatform {
   void setUpdateListener(UpdateListener listener) {
     _listener = listener;
   }
+
+  @override
+  void removeUpdateListener() {
+    _listener = null;
+  }
 }
