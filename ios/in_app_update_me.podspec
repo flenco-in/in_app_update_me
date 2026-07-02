@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'in_app_update_me'
-  s.version          = '1.0.0'
+  s.version          = '1.1.2'
   s.summary          = 'A comprehensive Flutter plugin for in-app updates supporting both Android and iOS.'
   s.description      = <<-DESC
 A Flutter plugin that provides in-app update capabilities for both Android and iOS platforms with direct update functionality and force update handling.

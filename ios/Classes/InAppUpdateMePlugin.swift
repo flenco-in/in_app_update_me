@@ -91,12 +91,13 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
                 let appStoreVersion = appInfo["version"] as? String ?? ""
                 let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
                 let updateAvailable = self?.isVersionNewer(appStoreVersion: appStoreVersion, currentVersion: currentVersion) ?? false
-                
+                let appStoreUrl = InAppUpdateMePlugin.appStoreURL(from: appInfo) ?? ""
+
                 result([
                     "updateAvailable": updateAvailable,
                     "appStoreVersion": appStoreVersion,
                     "currentVersion": currentVersion,
-                    "appStoreUrl": "https://apps.apple.com/app/id\(appInfo["trackId"] as? Int64 ?? 0)",
+                    "appStoreUrl": appStoreUrl,
                     "flexibleUpdateAllowed": false,
                     "immediateUpdateAllowed": true
                 ])
@@ -240,14 +241,15 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
     }
     
     private func redirectToAppStore(result: @escaping FlutterResult) {
-        guard let bundleId = Bundle.main.bundleIdentifier else {
-            result(FlutterError(code: "INVALID_BUNDLE_ID", message: "Cannot get bundle identifier", details: nil))
-            return
-        }
-        
-        let appStoreUrl = "https://apps.apple.com/app/id\(bundleId)"
-        if let url = URL(string: appStoreUrl) {
+        // The App Store id is not derivable from the bundle identifier, so we
+        // resolve the real store URL via the iTunes lookup before opening it.
+        fetchAppStoreURL { urlString in
             DispatchQueue.main.async {
+                guard let urlString = urlString, let url = URL(string: urlString) else {
+                    result(FlutterError(code: "CANNOT_OPEN_APP_STORE", message: "Cannot resolve App Store URL", details: nil))
+                    return
+                }
+
                 if UIApplication.shared.canOpenURL(url) {
                     UIApplication.shared.open(url) { success in
                         result(success)
@@ -256,9 +258,42 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
                     result(FlutterError(code: "CANNOT_OPEN_APP_STORE", message: "Cannot open App Store", details: nil))
                 }
             }
-        } else {
-            result(FlutterError(code: "INVALID_APP_STORE_URL", message: "Invalid App Store URL", details: nil))
         }
+    }
+
+    /// Resolves the canonical App Store URL for this app via the iTunes lookup.
+    private func fetchAppStoreURL(completion: @escaping (String?) -> Void) {
+        guard let bundleId = Bundle.main.bundleIdentifier,
+              let url = URL(string: "https://itunes.apple.com/lookup?bundleId=\(bundleId)") else {
+            completion(nil)
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                  let results = json["results"] as? [[String: Any]],
+                  let appInfo = results.first else {
+                completion(nil)
+                return
+            }
+            completion(InAppUpdateMePlugin.appStoreURL(from: appInfo))
+        }.resume()
+    }
+
+    /// Builds an App Store URL from an iTunes lookup result, preferring the
+    /// canonical `trackViewUrl` and falling back to the numeric `trackId`.
+    private static func appStoreURL(from appInfo: [String: Any]) -> String? {
+        if let trackViewUrl = appInfo["trackViewUrl"] as? String, !trackViewUrl.isEmpty {
+            return trackViewUrl
+        }
+        if let trackId = appInfo["trackId"] as? Int {
+            return "https://apps.apple.com/app/id\(trackId)"
+        }
+        if let trackId = (appInfo["trackId"] as? NSNumber)?.intValue {
+            return "https://apps.apple.com/app/id\(trackId)"
+        }
+        return nil
     }
     
     private func isVersionNewer(appStoreVersion: String, currentVersion: String) -> Bool {

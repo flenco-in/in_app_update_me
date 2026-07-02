@@ -130,20 +130,20 @@ class InAppUpdateMe {
   /// Open App Store/Play Store for manual update
   Future<bool> openStore() async {
     try {
-      String storeUrl;
       if (Platform.isAndroid) {
         final packageInfo = await PackageInfo.fromPlatform();
-        storeUrl = 'https://play.google.com/store/apps/details?id=${packageInfo.packageName}';
-      } else if (Platform.isIOS) {
-        // This would need the actual App Store ID
-        storeUrl = 'https://apps.apple.com/app/your-app-id';
-      } else {
+        final storeUrl =
+            'https://play.google.com/store/apps/details?id=${packageInfo.packageName}';
+        final uri = Uri.parse(storeUrl);
+        if (await canLaunchUrl(uri)) {
+          return await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
         return false;
-      }
-
-      final uri = Uri.parse(storeUrl);
-      if (await canLaunchUrl(uri)) {
-        return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else if (Platform.isIOS) {
+        // The App Store id is not known on the Dart side. Delegate to the
+        // native layer, which resolves the correct App Store URL via the
+        // iTunes lookup and opens it.
+        return await _platform.startImmediateUpdate();
       }
       return false;
     } catch (e) {

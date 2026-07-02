@@ -153,9 +153,13 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
   }
 
   private fun startFlexibleUpdate(call: MethodCall, result: Result) {
-    if (activity == null || appUpdateManager == null) {
-      result.error("NOT_AVAILABLE", "Activity or AppUpdateManager not available", null)
+    if (activity == null) {
+      result.error("NO_ACTIVITY", "Activity is not available", null)
       return
+    }
+
+    if (appUpdateManager == null) {
+      appUpdateManager = AppUpdateManagerFactory.create(context)
     }
 
     appUpdateManager?.registerListener(installStateUpdatedListener)
@@ -184,9 +188,13 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
   }
 
   private fun startImmediateUpdate(call: MethodCall, result: Result) {
-    if (activity == null || appUpdateManager == null) {
-      result.error("NOT_AVAILABLE", "Activity or AppUpdateManager not available", null)
+    if (activity == null) {
+      result.error("NO_ACTIVITY", "Activity is not available", null)
       return
+    }
+
+    if (appUpdateManager == null) {
+      appUpdateManager = AppUpdateManagerFactory.create(context)
     }
 
     appUpdateManager?.appUpdateInfo?.addOnSuccessListener { appUpdateInfo ->
@@ -241,29 +249,28 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
           }
 
           val file = File(context.getExternalFilesDir(null), "update.apk")
-          val fos = FileOutputStream(file)
-          
-          response.body?.byteStream()?.use { inputStream ->
-            val buffer = ByteArray(8192)
-            var bytesRead: Int
-            var totalBytesRead = 0L
-            val totalSize = response.body?.contentLength() ?: 0L
+          val totalSize = response.body?.contentLength() ?: 0L
 
-            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-              fos.write(buffer, 0, bytesRead)
-              totalBytesRead += bytesRead
-              
-              if (totalSize > 0) {
-                val progress = (totalBytesRead.toDouble() / totalSize.toDouble() * 100).toInt()
-                withContext(Dispatchers.Main) {
-                  channel.invokeMethod("onUpdateProgress", mapOf("progress" to progress))
+          FileOutputStream(file).use { fos ->
+            response.body?.byteStream()?.use { inputStream ->
+              val buffer = ByteArray(8192)
+              var bytesRead: Int
+              var totalBytesRead = 0L
+
+              while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                fos.write(buffer, 0, bytesRead)
+                totalBytesRead += bytesRead
+
+                if (totalSize > 0) {
+                  val progress = (totalBytesRead.toDouble() / totalSize.toDouble() * 100).toInt()
+                  withContext(Dispatchers.Main) {
+                    channel.invokeMethod("onUpdateProgress", mapOf("progress" to progress))
+                  }
                 }
               }
             }
           }
-          
-          fos.close()
-          
+
           withContext(Dispatchers.Main) {
             installApk(file, result)
           }

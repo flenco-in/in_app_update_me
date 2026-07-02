@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-07-03
+
+### Fixed
+- **Dart**: `checkForUpdate` now uses `invokeMapMethod` instead of `invokeMethod<Map<String,dynamic>>` — the previous call threw a runtime cast error and always silently returned `null`, breaking the core update-check flow on both platforms.
+- **Dart**: `openStore()` on iOS no longer opens a hardcoded placeholder URL; it now delegates to the native layer which resolves the real App Store link via iTunes lookup.
+- **Android**: `startImmediateUpdate()` and `startFlexibleUpdate()` no longer fail with `NOT_AVAILABLE` when called without a prior `checkForUpdate`; the `AppUpdateManager` is now lazily created in each method.
+- **Android**: Fixed `FileOutputStream` leak in `downloadAndInstallApk` — stream is now closed via Kotlin `.use {}` on both success and error paths.
+- **iOS**: `redirectToAppStore` no longer constructs an invalid URL by inserting the bundle identifier where a numeric App Store track id is expected; the correct URL is now resolved via an iTunes lookup.
+- **iOS**: `trackId` cast `as? Int64` replaced with a `NSNumber`-safe helper (`appStoreURL(from:)`) that prefers the canonical `trackViewUrl` from the lookup response.
+
 ## [1.0.0] - 2024-01-15
 
 ### Added

@@ -56,7 +56,11 @@ class MethodChannelInAppUpdateMe extends InAppUpdateMePlatform {
     String? currentVersion,
   }) async {
     try {
-      final result = await methodChannel.invokeMethod<Map<String, dynamic>>(
+      // Platform channels decode maps as Map<Object?, Object?>; invokeMapMethod
+      // performs the cast to Map<String, dynamic> so fromMap receives the
+      // expected type. Using invokeMethod<Map<String, dynamic>> would throw a
+      // cast error at runtime and silently return null.
+      final result = await methodChannel.invokeMapMethod<String, dynamic>(
         'checkForUpdate',
         {
           'usePlayStore': useStore, // Android
@@ -65,7 +69,7 @@ class MethodChannelInAppUpdateMe extends InAppUpdateMePlatform {
           'currentVersion': currentVersion,
         },
       );
-      
+
       if (result != null) {
         return UpdateInfo.fromMap(result);
       }
