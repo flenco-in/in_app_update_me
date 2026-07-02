@@ -1,21 +1,25 @@
-# Exclude test server from published package
-test_server/
-
-# Exclude development files
+# Development / IDE
 .git/
 .github/
 .vscode/
 .idea/
-
-# Exclude build directories
+.claude/
 build/
 .dart_tool/
-
-# Exclude logs and temporary files
 *.log
 *.tmp
 
-# Exclude Claude Code files
-.claude/
-*.claude
-claude_*
+# Generated example files — produced by flutter pub get / build tools;
+# consumers generate these themselves, no need to ship them.
+example/ios/Flutter/Generated.xcconfig
+example/ios/Flutter/ephemeral/
+example/ios/Flutter/flutter_export_environment.sh
+example/ios/Runner/GeneratedPluginRegistrant.h
+example/ios/Runner/GeneratedPluginRegistrant.m
+example/linux/flutter/generated_plugin_registrant.cc
+example/linux/flutter/generated_plugin_registrant.h
+example/linux/flutter/generated_plugins.cmake
+example/macos/Flutter/GeneratedPluginRegistrant.swift
+example/windows/flutter/generated_plugin_registrant.cc
+example/windows/flutter/generated_plugin_registrant.h
+example/windows/flutter/generated_plugins.cmake
