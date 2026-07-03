@@ -16,6 +16,8 @@ class MockInAppUpdateMePlatform
     bool useStore = true,
     String? updateUrl,
     String? currentVersion,
+    Map<String, String>? headers,
+    Duration? timeout,
   }) => Future.value(UpdateInfo(
     updateAvailable: true,
     immediateUpdateAllowed: true,
@@ -65,7 +67,10 @@ void main() {
     MockInAppUpdateMePlatform fakePlatform = MockInAppUpdateMePlatform();
     InAppUpdateMePlatform.instance = fakePlatform;
 
-    final updateInfo = await inAppUpdateMePlugin.checkForUpdate();
+    // Pass currentVersion explicitly: this test targets the platform-
+    // interface wiring, not package_info_plus's own platform channel, which
+    // has no mock registered in this test binding.
+    final updateInfo = await inAppUpdateMePlugin.checkForUpdate(currentVersion: '1.0.0');
     expect(updateInfo?.updateAvailable, true);
     expect(updateInfo?.immediateUpdateAllowed, true);
     expect(updateInfo?.flexibleUpdateAllowed, true);

@@ -53,11 +53,27 @@ class _ForceUpdateDialogState extends State<ForceUpdateDialog> {
   bool _isUpdating = false;
   int _downloadProgress = 0;
   String _statusMessage = '';
+  DefaultUpdateListener? _previousListener;
 
   @override
   void initState() {
     super.initState();
+    // Save whatever listener the app already had registered so it can be
+    // restored on dispose — otherwise showing this dialog would silently
+    // and permanently replace the app's own update listener.
+    _previousListener = InAppUpdateMe().currentListener;
     _setupUpdateListener();
+  }
+
+  @override
+  void dispose() {
+    final previous = _previousListener;
+    if (previous != null) {
+      InAppUpdateMe().setUpdateListener(previous);
+    } else {
+      InAppUpdateMe().removeUpdateListener();
+    }
+    super.dispose();
   }
 
   void _setupUpdateListener() {

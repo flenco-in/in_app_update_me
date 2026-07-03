@@ -22,6 +22,8 @@ abstract class InAppUpdateMePlatform extends PlatformInterface {
     bool useStore = true,
     String? updateUrl,
     String? currentVersion,
+    Map<String, String>? headers,
+    Duration? timeout,
   }) {
     throw UnimplementedError('checkForUpdate() has not been implemented.');
   }

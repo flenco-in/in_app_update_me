@@ -1,7 +1,7 @@
 # in_app_update_me
 
 [![pub.dev](https://img.shields.io/pub/v/in_app_update_me.svg)](https://pub.dev/packages/in_app_update_me)
-[![Flutter](https://img.shields.io/badge/Flutter->=3.0.0-blue.svg)](https://flutter.dev/)
+[![Flutter](https://img.shields.io/badge/Flutter->=3.27.0-blue.svg)](https://flutter.dev/)
 [![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS-lightgrey.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -24,7 +24,7 @@ Flutter plugin for in-app updates on Android (Google Play In-App Updates API) an
 
 ```yaml
 dependencies:
-  in_app_update_me: ^1.1.2
+  in_app_update_me: ^1.2.0
 ```
 
 ---
@@ -69,17 +69,19 @@ Create `android/app/src/main/res/xml/file_paths.xml`:
 
 ## iOS setup
 
-**`ios/Podfile`** — minimum iOS 11:
+**`ios/Podfile`** — minimum iOS 13:
 ```ruby
-platform :ios, '11.0'
+platform :ios, '13.0'
 ```
 
-**For enterprise/ad-hoc OTA flexible updates** — add to your `AppDelegate.swift` so the system can wake the app when a background download finishes:
+**For enterprise/ad-hoc OTA flexible updates** — add to your `AppDelegate.swift` so the system can wake the app when a background download finishes. Store the completion handler rather than calling it immediately — it must only run after the background session has finished delivering its events, or a download that completed while the app was suspended/killed can be lost:
 ```swift
-func application(_ application: UIApplication,
+import in_app_update_me
+
+override func application(_ application: UIApplication,
                  handleEventsForBackgroundURLSession identifier: String,
                  completionHandler: @escaping () -> Void) {
-    completionHandler()
+    InAppUpdateMePlugin.backgroundCompletionHandler = completionHandler
 }
 ```
 
@@ -94,11 +96,9 @@ import 'package:in_app_update_me/in_app_update_me.dart';
 
 final updater = InAppUpdateMe();
 
-// Initialize once (e.g. in initState)
-updater.initialize(const UpdateConfig(useStore: true));
-
-// Listen to update events
+// Register the listener first so the automatic check below can reach it.
 updater.setUpdateListener(DefaultUpdateListener(
+  onCheckCompleted: (available) => print('update available: $available'),
   onProgress: (p) => print('$p%'),
   onDownloaded: () => print('ready to install'),
   onFailed: (e) => print('error: $e'),
@@ -107,7 +107,13 @@ updater.setUpdateListener(DefaultUpdateListener(
   onInstallStarted: () => print('iOS: install started'),
 ));
 
-// Check for update
+// initialize() checks for an update immediately by default
+// (UpdateConfig.autoCheckOnAppStart) and reports back via the listener
+// above. Pass autoCheckOnAppStart: false to disable and drive checks
+// manually instead (e.g. from a "Check for updates" button).
+updater.initialize(const UpdateConfig(useStore: true));
+
+// A manual check works the same way at any time:
 final info = await updater.checkForUpdate();
 
 if (info?.updateAvailable == true) {
@@ -129,12 +135,15 @@ if (info?.updateAvailable == true) {
 ```dart
 UpdateConfig(
   useStore: true,                          // true = Play Store / App Store
-  forceUpdate: false,                      // show ForceUpdateDialog if true
-  checkInterval: const Duration(hours: 6),
-  showProgressDialog: true,
-  minimumPriority: UpdatePriority.low,     // low | medium | high | critical
+  forceUpdate: false,                      // gate for the force-update branch of performUpdateCheck()
+  autoCheckOnAppStart: true,               // initialize() calls performUpdateCheck() immediately when true
+  checkInterval: const Duration(hours: 6), // throttles that automatic check, not manual calls
+  showProgressDialog: true,                // reserved — the plugin never shows UI on its own; see Pre-built widgets
+  minimumPriority: UpdatePriority.low,     // low | medium | high | critical — floor below which forceUpdate is ignored
 )
 ```
+
+`initialize(config)` is synchronous; when `autoCheckOnAppStart` is true it fires `performUpdateCheck()` in the background and delivers the result through the registered listener's `onUpdateCheckCompleted`/`onUpdateNotAvailable` callbacks, not a return value. `checkInterval` only throttles this automatic path — explicit `checkForUpdate()`/`performUpdateCheck()` calls (e.g. a manual "Check for updates" button) always run immediately. The throttle is in-memory only and resets on app restart.
 
 ---
 
@@ -159,20 +168,44 @@ if (info != null && (info.shouldForceUpdate || config.forceUpdate)) {
 
 ## Direct APK install (Android sideloading)
 
-Use this for enterprise Android apps distributed outside the Play Store.
+Use this for enterprise Android/iOS apps distributed outside the Play Store / App Store.
+
+`checkForUpdate(useStore: false, updateUrl: ...)` hits your `updateUrl` and, if the response body is JSON, reads it as a manifest:
+
+```json
+{
+  "updateAvailable": true,
+  "version": "1.2.0",
+  "downloadUrl": "https://your-server.com/app.apk",
+  "priority": 5,
+  "forceUpdate": true
+}
+```
+
+All keys are optional. If the response isn't JSON, or a key is missing, the plugin falls back to: `updateAvailable: true` (reachable = available) and `downloadUrl` equal to `updateUrl` itself — so a server that just returns 200/404 with no body still works, but can't drive `AppUpdateInfo.downloadUrl` to a different URL than the one you checked, and can't drive `shouldForceUpdate`/priority. The bundled [`test_server`](test_server/) implements this manifest shape.
 
 ```dart
 final info = await updater.checkForUpdate(
   useStore: false,
   updateUrl: 'https://your-server.com/api/version',
   currentVersion: '1.2.0',
+  headers: {'Authorization': 'Bearer <token>'}, // optional
+  timeout: const Duration(seconds: 15),          // optional
 );
 
-// The plugin always treats a reachable updateUrl as "update available".
-// Your server should only serve the endpoint when an update exists.
 if (info?.updateAvailable == true) {
-  await updater.downloadAndInstallUpdate('https://your-server.com/app.apk');
+  await updater.downloadAndInstallUpdate(info!.downloadUrl ?? 'https://your-server.com/app.apk');
 }
+```
+
+`DirectUpdateConfig` builds `updateUrl`/`headers`/`timeout` for you from `serverUrl` + `versionEndpoint`, and works directly with `performUpdateCheck()`:
+
+```dart
+final result = await updater.performUpdateCheck(const DirectUpdateConfig(
+  serverUrl: 'https://your-server.com',
+  versionEndpoint: '/api/version',
+  forceUpdate: true, // only takes effect if the manifest's priority/forceUpdate meets minimumPriority
+));
 ```
 
 ---
@@ -241,9 +274,12 @@ UpdateProgressDialog.show(context,
 - `completeFlexibleUpdate` must be called after `onDownloaded` fires, not immediately after `startFlexibleUpdate`.
 
 **iOS**
-- `checkForUpdate` hits the iTunes lookup API. If your app is not yet published on the App Store, it returns `updateAvailable: false` (not an error).
+- `checkForUpdate` hits the iTunes lookup API, scoped to the device's current region automatically. If your app is not yet published on the App Store (or not published in that region), it returns `updateAvailable: false` (not an error).
 - Flexible updates on iOS require `itms-services://` URLs (enterprise/ad-hoc only). Regular App Store apps have no background-download path — the user is redirected to the App Store.
-- Background downloads require the `handleEventsForBackgroundURLSession` AppDelegate hook (see iOS setup above).
+- Background downloads require the `handleEventsForBackgroundURLSession` AppDelegate hook (see iOS setup above), otherwise a download that finishes while the app is suspended or killed may not be reported.
+
+**Both platforms**
+- `ForceUpdateDialog` temporarily replaces your registered listener (to drive its own progress UI) and restores your previous one when the dialog is dismissed — you don't need to call `setUpdateListener` again afterward.
 
 ---
 

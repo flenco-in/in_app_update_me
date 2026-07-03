@@ -54,6 +54,8 @@ class MethodChannelInAppUpdateMe extends InAppUpdateMePlatform {
     bool useStore = true,
     String? updateUrl,
     String? currentVersion,
+    Map<String, String>? headers,
+    Duration? timeout,
   }) async {
     try {
       // Platform channels decode maps as Map<Object?, Object?>; invokeMapMethod
@@ -67,6 +69,8 @@ class MethodChannelInAppUpdateMe extends InAppUpdateMePlatform {
           'useAppStore': useStore,  // iOS
           'updateUrl': updateUrl,
           'currentVersion': currentVersion,
+          'headers': headers,
+          'timeoutMs': timeout?.inMilliseconds,
         },
       );
 

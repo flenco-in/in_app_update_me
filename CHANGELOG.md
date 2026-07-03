@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-03
+
+### Fixed
+- **Android/iOS**: `checkForUpdate(useStore: false, ...)` (direct/enterprise updates) now parses the version-check response body as a JSON manifest (`updateAvailable`, `version`, `downloadUrl`, `priority`, `forceUpdate`). Previously `downloadUrl` was always set to the version-check URL itself, so `performUpdateCheck()`, `ForceUpdateDialog`, and `UpdateAvailableDialog` would try to download and install that URL's response body (e.g. a JSON payload) instead of the actual APK/IPA. Falls back to the pre-1.2.0 behaviour (reachable = available, reuse the checked URL) for non-JSON responses.
+- **Android**: direct-update responses now set `immediateUpdateAllowed`/`flexibleUpdateAllowed`, matching iOS — previously Android left both unset (defaulting to `false`), so the same server response enabled "Start Immediate/Flexible Update" UI on iOS but not Android.
+- **Dart**: `InAppUpdateMe` is a permanent singleton but captured `InAppUpdateMePlatform.instance` once into a `final` field at first construction, permanently ignoring any later `InAppUpdateMePlatform.instance = ...` reassignment — including the standard test-mocking pattern used by this package's own test suite (5 of 8 tests were failing before this fix). `_platform` is now resolved dynamically on each access.
+- **Dart**: `DirectUpdateConfig` passed to `performUpdateCheck()` always failed with `INVALID_ARGUMENTS` — the method read the inherited `updateUrl` field, which `DirectUpdateConfig` never sets (it derives `versionCheckUrl` from `serverUrl` + `versionEndpoint` instead). `performUpdateCheck()` now resolves the correct URL, headers and timeout for `DirectUpdateConfig`.
+- **Dart**: `ForceUpdateDialog` replaced the app's globally registered update listener in `initState()` and never restored it, so any `onProgress`/`onDownloaded`/etc. callbacks registered elsewhere in the app silently stopped firing forever once the dialog had been shown once. The previous listener is now saved and restored in `dispose()`.
+- **Dart**: `UpdateConfig.autoCheckOnAppStart`, `checkInterval`, and `minimumPriority` were declared and documented but never read anywhere. `initialize()` now actually performs an automatic `performUpdateCheck()` when `autoCheckOnAppStart` is true, throttled by `checkInterval`; `performUpdateCheck()` now gates the force-update branch on `minimumPriority` and invokes the listener's `onUpdateCheckCompleted`/`onUpdateNotAvailable` callbacks (previously unreachable dead code).
+- **iOS**: the documented `handleEventsForBackgroundURLSession` AppDelegate hook told integrators to call `completionHandler()` immediately, which can cause iOS to reclaim the app before a background download that just completed is actually processed. The plugin now exposes `InAppUpdateMePlugin.backgroundCompletionHandler` and implements `urlSessionDidFinishEvents(forBackgroundURLSession:)` to call it at the correct time.
+- **iOS**: the iTunes lookup (`checkForUpdate`/`openStore`) omitted a storefront `country` parameter, so apps not distributed in the US App Store always resolved zero results and reported `updateAvailable: false` even when a real update existed. Now scoped to the device's current region automatically.
+
+### Added
+- **Android/iOS**: `checkForUpdate()` / `DirectUpdateConfig` now support optional `headers` and `timeout` for the direct-update version-check request (previously declared on `DirectUpdateConfig` but never forwarded to the native layer).
+
+### Changed
+- Updated dependencies: `package_info_plus` (4.2.0 → `>=8.1.2 <11.0.0`), `url_launcher` (^6.2.1 → ^6.3.2), `plugin_platform_interface` (^2.1.7 → ^2.1.8), `flutter_lints` (^3.0.1 → ^5.0.0).
+- Updated Android toolchain: AGP 7.3.0 → 8.11.1, Kotlin 1.7.10 → 2.2.20, `compileSdk`/`targetSdk` 33 → 35, Java/Kotlin target 1.8 → 11, `kotlinx-coroutines-android` 1.7.1 → 1.10.2, Gradle wrapper (example) 8.12 → 8.14. Swapped `androidx.appcompat:appcompat` for the lighter `androidx.core:core` (the plugin only needs `FileProvider`).
+- Updated iOS minimum deployment target 11.0 → 13.0 (podspec + example), matching current Flutter project templates.
+- Minimum supported SDK raised to Dart 3.6.0 / Flutter 3.27.0 (previously Dart 3.0.0), driven by the above dependency floors.
+- Plugin `AndroidManifest.xml` no longer declares `REQUEST_INSTALL_PACKAGES` (must be declared by the consuming app if using direct APK installs — was already documented this way) or `INSTALL_PACKAGES` (a system-signature-only permission a third-party app can never hold; had no effect).
+- `TESTING_GUIDE.md` and `test_server/` are excluded from the published package via `.pubignore` (still available in the git repo) — they're contributor tooling, not something every consumer needs to download.
+
+### Fixed (build)
+- Removed a stale, untouched-since-initial-commit `example/android/app/build.gradle` (Groovy) that coexisted with `example/android/app/build.gradle.kts` (Kotlin DSL). Gradle silently prefers the Groovy file when both exist, so the example had been building against `compileSdkVersion 33`/Kotlin 1.7.10/Java 8 regardless of the `.kts` file's settings.
+
 ## [1.1.3] - 2026-07-03
 
 ### Fixed

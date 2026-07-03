@@ -26,9 +26,11 @@ import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry
 import kotlinx.coroutines.*
 import okhttp3.*
+import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.ActivityResultListener {
   private lateinit var channel: MethodChannel
@@ -89,14 +91,16 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
 
   private fun checkForUpdate(call: MethodCall, result: Result) {
     val usePlayStore = call.argument<Boolean>("usePlayStore") ?: true
-    
+
     if (usePlayStore) {
       checkPlayStoreUpdate(result)
     } else {
       val updateUrl = call.argument<String>("updateUrl")
       val currentVersion = call.argument<String>("currentVersion")
+      val headers = call.argument<Map<String, String>>("headers")
+      val timeoutMs = call.argument<Int>("timeoutMs")
       if (updateUrl != null && currentVersion != null) {
-        checkDirectUpdate(updateUrl, currentVersion, result)
+        checkDirectUpdate(updateUrl, currentVersion, headers, timeoutMs, result)
       } else {
         result.error("INVALID_ARGUMENTS", "updateUrl and currentVersion are required for direct updates", null)
       }
@@ -130,12 +134,25 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
     }
   }
 
-  private fun checkDirectUpdate(updateUrl: String, currentVersion: String, result: Result) {
+  private fun checkDirectUpdate(
+    updateUrl: String,
+    currentVersion: String,
+    headers: Map<String, String>?,
+    timeoutMs: Int?,
+    result: Result
+  ) {
     pluginScope.launch {
       try {
-        val client = OkHttpClient()
-        val request = Request.Builder().url(updateUrl).build()
-        
+        val clientBuilder = OkHttpClient.Builder()
+        if (timeoutMs != null && timeoutMs > 0) {
+          clientBuilder.callTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+        }
+        val client = clientBuilder.build()
+
+        val requestBuilder = Request.Builder().url(updateUrl)
+        headers?.forEach { (key, value) -> requestBuilder.addHeader(key, value) }
+        val request = requestBuilder.build()
+
         client.newCall(request).execute().use { response ->
           if (!response.isSuccessful) {
             withContext(Dispatchers.Main) {
@@ -144,12 +161,40 @@ class InAppUpdateMePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plug
             return@launch
           }
 
+          // The response body may be a JSON manifest (as served by the
+          // bundled test_server) describing the real download location,
+          // version and priority. If it isn't JSON — or lacks these keys —
+          // fall back to treating "reachable" as "update available" and
+          // reuse updateUrl, which is the plugin's original behaviour and
+          // keeps servers that just 200/404 on the version endpoint working.
+          val bodyString = response.body?.string()
+          val json = bodyString?.let {
+            try { JSONObject(it) } catch (e: Exception) { null }
+          }
+
+          val updateAvailable = json?.optBoolean("updateAvailable", true) ?: true
+          val downloadUrl = json?.optString("downloadUrl", "")?.takeIf { it.isNotEmpty() } ?: updateUrl
+          val latestVersion = json?.optString("version", "")?.takeIf { it.isNotEmpty() }
+          val forceUpdate = json?.optBoolean("forceUpdate", false) ?: false
+          val priority = when {
+            json?.has("priority") == true -> json.optInt("priority", 0)
+            forceUpdate -> 5
+            else -> 0
+          }
+
           withContext(Dispatchers.Main) {
             result.success(mapOf(
-              "updateAvailable" to true,
+              "updateAvailable" to updateAvailable,
               "directUpdate" to true,
-              "downloadUrl" to updateUrl,
-              "currentVersion" to currentVersion
+              "downloadUrl" to downloadUrl,
+              "currentVersion" to currentVersion,
+              "appStoreVersion" to latestVersion,
+              "updatePriority" to priority,
+              // No Play-style gating applies to direct updates — if the
+              // server says an update is available, treat both flows as
+              // usable. Mirrors iOS, which already reports both as true.
+              "immediateUpdateAllowed" to updateAvailable,
+              "flexibleUpdateAllowed" to updateAvailable
             ))
           }
         }

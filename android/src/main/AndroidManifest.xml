@@ -1,8 +1,11 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-  package="com.flenco.in_app_update_me">
-  
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
   <uses-permission android:name="android.permission.INTERNET" />
-  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-  <uses-permission android:name="android.permission.INSTALL_PACKAGES" />
+
+  <!--
+    REQUEST_INSTALL_PACKAGES is intentionally NOT declared here: merging it
+    into every consumer app triggers Google Play policy review even for apps
+    that only use Play in-app updates. Apps using direct APK installs must
+    declare it in their own manifest (see README).
+  -->
 </manifest>

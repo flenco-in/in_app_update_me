@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import in_app_update_me
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -9,5 +10,13 @@ import UIKit
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  override func application(
+    _ application: UIApplication,
+    handleEventsForBackgroundURLSession identifier: String,
+    completionHandler: @escaping () -> Void
+  ) {
+    InAppUpdateMePlugin.backgroundCompletionHandler = completionHandler
   }
 }

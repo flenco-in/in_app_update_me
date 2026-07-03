@@ -9,7 +9,15 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
     private var downloadedFileURL: URL?
     private var flexibleUpdateInfo: [String: Any]?
     private var lastReportedProgress = -1
-    
+
+    /// Set by the host app's AppDelegate from
+    /// `application(_:handleEventsForBackgroundURLSession:completionHandler:)`.
+    /// Must be called only after the background session finishes delivering
+    /// all queued delegate events (see `urlSessionDidFinishEvents`) — calling
+    /// it immediately can cause iOS to reclaim the app before a download that
+    /// completed in the background is actually processed.
+    public static var backgroundCompletionHandler: (() -> Void)?
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "in_app_update_me", binaryMessenger: registrar.messenger())
         let instance = InAppUpdateMePlugin()
@@ -62,13 +70,29 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
                 result(FlutterError(code: "INVALID_ARGUMENTS", message: "updateUrl and currentVersion are required for direct updates", details: nil))
                 return
             }
-            checkDirectUpdate(updateUrl: updateUrl, currentVersion: currentVersion, result: result)
+            let headers = args["headers"] as? [String: String]
+            let timeoutMs = args["timeoutMs"] as? Int
+            checkDirectUpdate(updateUrl: updateUrl, currentVersion: currentVersion, headers: headers, timeoutMs: timeoutMs, result: result)
         }
     }
     
+    /// Builds the iTunes lookup URL, scoped to the device's storefront
+    /// country when known. Without this, apps not distributed in the US
+    /// store return zero results from the bare bundleId lookup and always
+    /// report "no update available" even when one exists.
+    private static func iTunesLookupURL(bundleId: String) -> URL? {
+        var components = URLComponents(string: "https://itunes.apple.com/lookup")
+        var queryItems = [URLQueryItem(name: "bundleId", value: bundleId)]
+        if let country = Locale.current.regionCode {
+            queryItems.append(URLQueryItem(name: "country", value: country))
+        }
+        components?.queryItems = queryItems
+        return components?.url
+    }
+
     private func checkAppStoreUpdate(result: @escaping FlutterResult) {
         guard let bundleId = Bundle.main.bundleIdentifier,
-              let url = URL(string: "https://itunes.apple.com/lookup?bundleId=\(bundleId)") else {
+              let url = InAppUpdateMePlugin.iTunesLookupURL(bundleId: bundleId) else {
             result(FlutterError(code: "INVALID_BUNDLE_ID", message: "Cannot get bundle identifier", details: nil))
             return
         }
@@ -115,27 +139,53 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
         }.resume()
     }
     
-    private func checkDirectUpdate(updateUrl: String, currentVersion: String, result: @escaping FlutterResult) {
+    private func checkDirectUpdate(updateUrl: String, currentVersion: String, headers: [String: String]?, timeoutMs: Int?, result: @escaping FlutterResult) {
         guard let url = URL(string: updateUrl) else {
             result(FlutterError(code: "INVALID_URL", message: "Invalid update URL", details: nil))
             return
         }
-        
-        URLSession.shared.dataTask(with: url) { data, response, error in
+
+        var request = URLRequest(url: url)
+        headers?.forEach { key, value in request.setValue(value, forHTTPHeaderField: key) }
+        if let timeoutMs = timeoutMs, timeoutMs > 0 {
+            request.timeoutInterval = TimeInterval(timeoutMs) / 1000.0
+        }
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
                     result(FlutterError(code: "NETWORK_ERROR", message: error.localizedDescription, details: nil))
                     return
                 }
-                
-                result([
-                    "updateAvailable": true,
+
+                // The response body may be a JSON manifest (as served by the
+                // bundled test_server) describing the real download location,
+                // version and priority. If it isn't JSON — or lacks these
+                // keys — fall back to treating "reachable" as "update
+                // available" and reuse updateUrl, matching the plugin's
+                // original behaviour for servers that just 200/404 on the
+                // version endpoint.
+                let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0, options: []) as? [String: Any] }
+
+                let updateAvailable = json?["updateAvailable"] as? Bool ?? true
+                let downloadUrl = (json?["downloadUrl"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? updateUrl
+                let latestVersion = (json?["version"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                let forceUpdate = json?["forceUpdate"] as? Bool ?? false
+                let priority = (json?["priority"] as? Int) ?? (forceUpdate ? 5 : 0)
+
+                var payload: [String: Any] = [
+                    "updateAvailable": updateAvailable,
                     "directUpdate": true,
-                    "downloadUrl": updateUrl,
+                    "downloadUrl": downloadUrl,
                     "currentVersion": currentVersion,
-                    "flexibleUpdateAllowed": true,
-                    "immediateUpdateAllowed": true
-                ])
+                    "updatePriority": priority,
+                    "flexibleUpdateAllowed": updateAvailable,
+                    "immediateUpdateAllowed": updateAvailable
+                ]
+                if let latestVersion = latestVersion {
+                    payload["appStoreVersion"] = latestVersion
+                }
+                result(payload)
             }
         }.resume()
     }
@@ -284,7 +334,7 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
     /// Resolves the canonical App Store URL for this app via the iTunes lookup.
     private func fetchAppStoreURL(completion: @escaping (String?) -> Void) {
         guard let bundleId = Bundle.main.bundleIdentifier,
-              let url = URL(string: "https://itunes.apple.com/lookup?bundleId=\(bundleId)") else {
+              let url = InAppUpdateMePlugin.iTunesLookupURL(bundleId: bundleId) else {
             completion(nil)
             return
         }
@@ -382,6 +432,16 @@ public class InAppUpdateMePlugin: NSObject, FlutterPlugin, URLSessionDownloadDel
             DispatchQueue.main.async { [weak self] in
                 self?.channel?.invokeMethod("onUpdateFailed", arguments: ["error": "Download failed: \(error.localizedDescription)"])
             }
+        }
+    }
+
+    /// Called once the background session has delivered every queued
+    /// delegate event after the app was relaunched to handle them. Signals
+    /// the OS that it's now safe to reclaim background-launch resources.
+    public func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+        DispatchQueue.main.async {
+            InAppUpdateMePlugin.backgroundCompletionHandler?()
+            InAppUpdateMePlugin.backgroundCompletionHandler = nil
         }
     }
 }

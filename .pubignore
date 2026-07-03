@@ -9,6 +9,11 @@ build/
 *.log
 *.tmp
 
+# Contributor-only docs/tooling — useful in the repo, unnecessary bloat in
+# every consumer's `flutter pub get` download.
+TESTING_GUIDE.md
+test_server/
+
 # Generated example files — produced by flutter pub get / build tools;
 # consumers generate these themselves, no need to ship them.
 example/ios/Flutter/Generated.xcconfig

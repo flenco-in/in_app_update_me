@@ -3,9 +3,26 @@ class UpdateConfig {
   final String? updateUrl;
   final String? currentVersion;
   final bool forceUpdate;
+
+  /// Minimum time between automatic checks triggered by
+  /// [autoCheckOnAppStart]. Only throttles that automatic path — explicit
+  /// calls to `checkForUpdate`/`performUpdateCheck` always run immediately.
   final Duration checkInterval;
+
+  /// Reserved for a future plugin-managed progress UI. The plugin never
+  /// shows dialogs on its own today — use [UpdateProgressDialog] (or your
+  /// own UI) with the `onProgress` listener callback. Currently a no-op.
   final bool showProgressDialog;
+
+  /// If true, calling [InAppUpdateMe.initialize] immediately runs
+  /// `performUpdateCheck`, throttled by [checkInterval]. Results are
+  /// delivered via the registered listener's `onUpdateCheckCompleted` /
+  /// `onUpdateNotAvailable` callbacks.
   final bool autoCheckOnAppStart;
+
+  /// Floor below which [forceUpdate] is ignored, comparing against the
+  /// store/server-reported update priority (defaults to allowing every
+  /// priority, matching pre-existing behaviour).
   final UpdatePriority minimumPriority;
 
   const UpdateConfig({

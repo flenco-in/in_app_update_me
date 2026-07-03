@@ -13,14 +13,39 @@ class InAppUpdateMe {
   factory InAppUpdateMe() => _instance;
   InAppUpdateMe._internal();
 
-  final InAppUpdateMePlatform _platform = InAppUpdateMePlatform.instance;
+  // A getter, not a `final` field: InAppUpdateMe is a permanent singleton, so
+  // capturing InAppUpdateMePlatform.instance once at first construction would
+  // permanently ignore any later `InAppUpdateMePlatform.instance = ...` —
+  // e.g. the standard test-mocking pattern, or the singleton simply being
+  // constructed before mocking is set up.
+  InAppUpdateMePlatform get _platform => InAppUpdateMePlatform.instance;
   DefaultUpdateListener? _updateListener;
+  DateTime? _lastAutoCheckAt;
 
   /// Initialize the plugin with configuration
+  ///
+  /// If [UpdateConfig.autoCheckOnAppStart] is true (the default), this kicks
+  /// off a [performUpdateCheck] immediately, throttled to at most once per
+  /// [UpdateConfig.checkInterval] for the lifetime of the app process. The
+  /// result is delivered through the registered listener's
+  /// `onUpdateCheckCompleted`/`onUpdateNotAvailable` callbacks, not a return
+  /// value, since this method is synchronous.
   void initialize(UpdateConfig config) {
     // Don't clobber a listener the developer already registered.
     _updateListener ??= DefaultUpdateListener();
     _platform.setUpdateListener(_updateListener!);
+
+    if (config.autoCheckOnAppStart) {
+      final lastCheck = _lastAutoCheckAt;
+      final dueForCheck =
+          lastCheck == null || DateTime.now().difference(lastCheck) >= config.checkInterval;
+      if (dueForCheck) {
+        _lastAutoCheckAt = DateTime.now();
+        // Fire-and-forget: checkForUpdate/performUpdateCheck already catch
+        // their own errors and report them via the registered listener.
+        performUpdateCheck(config);
+      }
+    }
   }
 
   /// Get platform version for debugging
@@ -29,14 +54,18 @@ class InAppUpdateMe {
   }
 
   /// Check for available updates
-  /// 
+  ///
   /// [useStore]: Whether to check Play Store/App Store (default: true)
   /// [updateUrl]: URL to check for direct updates (required if useStore is false)
   /// [currentVersion]: Current app version (optional, auto-detected if not provided)
+  /// [headers]: Optional HTTP headers sent with the direct-update version check
+  /// [timeout]: Optional timeout for the direct-update version check request
   Future<AppUpdateInfo?> checkForUpdate({
     bool useStore = true,
     String? updateUrl,
     String? currentVersion,
+    Map<String, String>? headers,
+    Duration? timeout,
   }) async {
     try {
       // Auto-detect current version if not provided
@@ -49,6 +78,8 @@ class InAppUpdateMe {
         useStore: useStore,
         updateUrl: updateUrl,
         currentVersion: currentVersion,
+        headers: headers,
+        timeout: timeout,
       );
 
       if (updateInfo != null) {
@@ -155,6 +186,11 @@ class InAppUpdateMe {
     }
   }
 
+  /// The currently registered listener, if any. Exposed so UI built on top
+  /// of this plugin (e.g. [ForceUpdateDialog]) can restore the caller's
+  /// listener after temporarily replacing it with its own.
+  DefaultUpdateListener? get currentListener => _updateListener;
+
   /// Set update listener for callbacks
   void setUpdateListener(DefaultUpdateListener listener) {
     _updateListener = listener;
@@ -169,10 +205,19 @@ class InAppUpdateMe {
 
   /// Convenience method to perform a complete update check and handle force updates
   Future<UpdateResult> performUpdateCheck(UpdateConfig config) async {
+    // DirectUpdateConfig builds its version-check URL from serverUrl +
+    // versionEndpoint rather than setting the inherited updateUrl directly.
+    final effectiveUpdateUrl =
+        config is DirectUpdateConfig ? config.versionCheckUrl : config.updateUrl;
+
     final updateInfo = await checkForUpdate(
       useStore: config.useStore,
-      updateUrl: config.updateUrl,
+      updateUrl: effectiveUpdateUrl,
+      headers: config is DirectUpdateConfig ? config.headers : null,
+      timeout: config is DirectUpdateConfig ? config.timeout : null,
     );
+
+    _updateListener?.onUpdateCheckCompleted(updateInfo?.updateAvailable ?? false);
 
     if (updateInfo == null) {
       return UpdateResult(
@@ -190,8 +235,13 @@ class InAppUpdateMe {
       );
     }
 
+    // Below the configured priority floor: still reported as available so
+    // callers can show an optional prompt, but never auto-forced.
+    final meetsMinimumPriority =
+        (updateInfo.updatePriority ?? 0) >= config.minimumPriority.value;
+
     // Handle force update
-    if (config.forceUpdate) {
+    if (config.forceUpdate && meetsMinimumPriority) {
       if (config.useStore) {
         if (Platform.isAndroid && updateInfo.immediateUpdateAllowed) {
           final success = await startImmediateUpdate();
